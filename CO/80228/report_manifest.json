@@ -1,0 +1,239 @@
+{
+  "input": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Jefferson/parcels/jefferson_80228_buildings_with_parcels.csv",
+  "output_dir": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report",
+  "state": "CO",
+  "county": "Jefferson",
+  "zip_code": "80228",
+  "started_at": "2026-07-10T15:33:50",
+  "ai": {
+    "requested": true,
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "allow_fallback": true
+  },
+  "counts": {
+    "rows_selected": 10,
+    "generated": 10,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 10,
+    "fallback": 0,
+    "blank_or_missing_images": 0,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "records": [
+    {
+      "row": 1,
+      "parcel": "4932200001",
+      "address": "13410 MORRISON RD",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4932200001-13410-morrison-rd.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 121.5,
+        "contrast": 28.61,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 2,
+      "parcel": "4907400006",
+      "address": "13300 W 2ND PL",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4907400006-13300-w-2nd-pl.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 134.27,
+        "contrast": 48.83,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 3,
+      "parcel": "4920200001",
+      "address": "13175 W GREEN MOUNTAIN DR",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4920200001-13175-w-green-mountain-dr.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 132.48,
+        "contrast": 50.31,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 4,
+      "parcel": "4908401015",
+      "address": "250 S ROUTT ST",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4908401015-250-s-routt-st.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 148.19,
+        "contrast": 65.5,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 5,
+      "parcel": "4917300002",
+      "address": "13165 W OHIO AVE",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4917300002-13165-w-ohio-ave.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 129.38,
+        "contrast": 50.21,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 6,
+      "parcel": "4917406019",
+      "address": "12364 W ALAMEDA PKWY",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4917406019-12364-w-alameda-pkwy.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 134.49,
+        "contrast": 51.73,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 7,
+      "parcel": "4917105011",
+      "address": "12043 W ALAMEDA PKWY",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4917105011-12043-w-alameda-pkwy.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 143.79,
+        "contrast": 54.76,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 8,
+      "parcel": "4908202002",
+      "address": "421 ZANG ST",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4908202002-421-zang-st.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 111.83,
+        "contrast": 59.32,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 9,
+      "parcel": "4908402004",
+      "address": "143 UNION BLVD",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4908402004-143-union-blvd.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 96.74,
+        "contrast": 50.46,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 10,
+      "parcel": "4917423001",
+      "address": "12250 W KENTUCKY DR",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80228/Reports/4917423001-12250-w-kentucky-dr.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 135.79,
+        "contrast": 41.97,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    }
+  ],
+  "finished_at": "2026-07-10T15:34:56"
+}

@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Arapahoe County Aerials aerial photo dated 03/01/2024",
+  "roof_type": "Low-slope commercial roof",
+  "roof_system": "Likely single-ply membrane roof (dark membrane surface; exact material not verifiable from aerial imagery)",
+  "roof_age_estimate": "Unknown; appears mature but serviceable, exact age not visible from image or metadata",
+  "roof_pitch": "Flat to very low slope",
+  "overall_score": 76,
+  "condition_label": "Good",
+  "risk_level": "Moderate",
+  "ai_confidence": 79,
+  "observations": [
+    "Large low-slope roof with generally uniform dark membrane coverage.",
+    "No obvious large open tears, missing sections, or widespread membrane failure visible from the aerial view.",
+    "Several rooftop penetrations and small mechanical curbs/vents are present and appear intact from this height.",
+    "No clear ponding, standing water, or major drainage distress visible.",
+    "Perimeter edges and flashing lines appear mostly continuous, though detailed seal condition cannot be confirmed from aerial imagery alone."
+  ],
+  "breakdown": {
+    "Membrane Condition": 77,
+    "Ponding": 85,
+    "Flashing & Seals": 74,
+    "Penetrations": 76,
+    "Overall Maintenance": 75
+  },
+  "summary": "The roof appears to be a large low-slope commercial membrane roof in generally good condition based on the 03/01/2024 aerial image. The surface looks broadly uniform with no evident major damage, ponding, or systemic distress visible from above. Minor wear or localized maintenance needs may exist at penetrations and edges, but nothing suggests near-term replacement from this image alone.",
+  "recommendation": "Continue routine roof maintenance and periodic on-site inspections, with attention to flashing, sealant condition around penetrations, and any localized repairs that may not be visible in aerial imagery.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 3172,
+    "cached_input_tokens": 0,
+    "output_tokens": 363,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 3535
+  }
+}

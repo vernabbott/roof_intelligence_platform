@@ -1,0 +1,239 @@
+{
+  "input": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Adams/parcels/adams_80022_buildings_with_parcels.csv",
+  "output_dir": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report",
+  "state": "CO",
+  "county": "Adams",
+  "zip_code": "80022",
+  "started_at": "2026-07-10T15:32:12",
+  "ai": {
+    "requested": true,
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "allow_fallback": true
+  },
+  "counts": {
+    "rows_selected": 10,
+    "generated": 10,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 10,
+    "fallback": 0,
+    "blank_or_missing_images": 0,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "records": [
+    {
+      "row": 1,
+      "parcel": "0182512304004",
+      "address": "5501 BRIGHTON BLVD",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0182512304004-5501-brighton-blvd.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 150.9,
+        "contrast": 55.21,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 2,
+      "parcel": "0182513201002",
+      "address": "5455 BRIGHTON BLVD",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0182513201002-5455-brighton-blvd.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 140.62,
+        "contrast": 47.55,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 3,
+      "parcel": "0172133301001",
+      "address": "7200 QUEBEC PKWY",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0172133301001-7200-quebec-pkwy.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 154.77,
+        "contrast": 60.19,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 4,
+      "parcel": "0182307408006",
+      "address": "5585 E 56TH AVE",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0182307408006-5585-e-56th-ave.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 174.03,
+        "contrast": 47.23,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 5,
+      "parcel": "0182317107020",
+      "address": "5101 QUEBEC ST",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0182317107020-5101-quebec-st.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 139.78,
+        "contrast": 64.26,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 6,
+      "parcel": "0182512101037",
+      "address": "6345 COLORADO BLVD",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0182512101037-6345-colorado-blvd.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 160.84,
+        "contrast": 58.01,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 7,
+      "parcel": "0182318106004",
+      "address": "5200 E 56TH AVE",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0182318106004-5200-e-56th-ave.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 163.33,
+        "contrast": 54.14,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 8,
+      "parcel": "0172131403004",
+      "address": "5075 HIGHWAY 224",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0172131403004-5075-highway-224.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 146.76,
+        "contrast": 58.23,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 9,
+      "parcel": "0172131311001",
+      "address": "4451 E 72ND AVE",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0172131311001-4451-e-72nd-ave.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 138.81,
+        "contrast": 64.65,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    },
+    {
+      "row": 10,
+      "parcel": "0172131300018",
+      "address": "4201 E 72ND AVE",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80022/Reports/0172131300018-4201-e-72nd-ave.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 110.78,
+        "contrast": 54.69,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    }
+  ],
+  "finished_at": "2026-07-10T15:33:31"
+}

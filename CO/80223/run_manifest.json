@@ -1,0 +1,53 @@
+{
+  "state": "CO",
+  "county": "Denver",
+  "county_profile": "denver",
+  "zip_code": "80223",
+  "started_at": "2026-07-10T15:35:16",
+  "paths": {
+    "input_csv": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Denver/parcels/denver_buildings_with_parcels_80223_sample10.csv",
+    "parcel_cache": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Denver/parcels/denver_80223_parcel_data.csv",
+    "aerial_imagery": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Denver/aerial_imagery",
+    "deliverables": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80223",
+    "report_manifest": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80223/report_manifest.json"
+  },
+  "commands": [
+    [
+      "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/.venv/bin/python",
+      "generate_roof_intelligence_reports.py",
+      "--input",
+      "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Denver/parcels/denver_buildings_with_parcels_80223_sample10.csv",
+      "--output-dir",
+      "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report",
+      "--state",
+      "CO",
+      "--county",
+      "Denver",
+      "--zip-code",
+      "80223",
+      "--manifest",
+      "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80223/report_manifest.json",
+      "--limit",
+      "10",
+      "--use-ai",
+      "--ai-provider",
+      "openai",
+      "--allow-ai-fallback",
+      "--force"
+    ]
+  ],
+  "status": "complete",
+  "report_summary": {
+    "rows_selected": 10,
+    "generated": 10,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 0,
+    "fallback": 10,
+    "blank_or_missing_images": 10,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "finished_at": "2026-07-10T15:35:20"
+}

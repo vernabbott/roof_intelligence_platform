@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Arapahoe County Aerials aerial photo dated 03/01/2024",
+  "roof_type": "Low-slope commercial roof",
+  "roof_system": "White single-ply membrane roof (likely TPO/PVC) with scattered rooftop penetrations and perimeter/parapet flashings",
+  "roof_age_estimate": "Unknown from imagery; appears mature but serviceable, likely mid-life based on surface wear and staining patterns",
+  "roof_pitch": "Low-slope / near-flat",
+  "overall_score": 72,
+  "condition_label": "Fair",
+  "risk_level": "Moderate",
+  "ai_confidence": 84,
+  "observations": [
+    "Large low-slope membrane roof with generally uniform field conditions across the main sections.",
+    "Visible surface discoloration, dirt accumulation, and weathering consistent with normal aging.",
+    "Localized staining and possible minor ponding/water-flow marks are present in some roof areas, especially near transitions and drainage pathways.",
+    "Numerous rooftop penetrations/vents are visible; most appear intact from aerial view with no obvious displaced components.",
+    "Perimeter edges and flashing lines appear continuous overall, with no major tears or open seams clearly visible at this resolution."
+  ],
+  "breakdown": {
+    "Membrane Condition": 74,
+    "Ponding": 68,
+    "Flashing & Seals": 72,
+    "Penetrations": 76,
+    "Overall Maintenance": 71
+  },
+  "summary": "The roof appears to be a large low-slope white membrane system in fair condition. Aerial imagery shows general weathering and some staining/possible minor ponding, but no severe membrane failures or major displaced components are evident from this view.",
+  "recommendation": "Continue routine maintenance and closer inspection of areas showing staining or drainage concentration. A hands-on roof review is recommended to verify seam integrity, flashing condition, and whether any localized ponding or coating wear is developing.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 3169,
+    "cached_input_tokens": 0,
+    "output_tokens": 364,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 3533
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo dated 09/06/2025",
+  "roof_type": "Low-slope commercial roof",
+  "roof_system": "Single-ply membrane roof, likely white reflective membrane",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 74,
+      "evidence": "Bright white, uniform low-slope roof surface with heat-welded single-ply appearance from aerial view; common on commercial office buildings."
+    },
+    {
+      "system": "Coating over membrane",
+      "confidence": 48,
+      "evidence": "Very light, reflective roof finish could also reflect a coated or recoated membrane; aerial imagery cannot confirm chemistry."
+    },
+    {
+      "system": "Modified bitumen",
+      "confidence": 22,
+      "evidence": "Low-slope commercial roof form could be modified bitumen, but the visible surface appears lighter and more uniform than typical cap sheet granule patterns."
+    }
+  ],
+  "roof_age_estimate": "Estimated moderate age; exact age not visible from aerial imagery.",
+  "roof_pitch": "Flat to very low slope",
+  "overall_score": 74,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 76,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": false,
+    "suspected_ponding": false,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Central rooftop equipment creates multiple penetrations and flashing locations.",
+      "No clear ponding, major staining, or widespread discoloration visible in the roof field.",
+      "Roof perimeter and surrounding landscaping appear maintained from aerial view."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include high penetration or rooftop-unit density.",
+    "Roof appears broadly uniform and reflective with no obvious tears, open seams, or extensive patching visible at this altitude.",
+    "Several rooftop units/curbs and service areas are concentrated along the central spine of the roof, increasing flashing and seal complexity.",
+    "The roof surface does not show pronounced dark staining or obvious ponded water signatures in the visible image.",
+    "Perimeter vegetation is present nearby, but no tree contact or debris accumulation on the roof is clearly visible."
+  ],
+  "breakdown": {
+    "Membrane Condition": 86,
+    "Ponding": 88,
+    "Flashing & Seals": 64,
+    "Penetrations": 58,
+    "Overall Maintenance": 80
+  },
+  "summary": "On the 09/06/2025 Esri aerial image, the roof presents as a generally well-kept low-slope commercial roof with a light-colored, uniform surface and no clear evidence of widespread staining or ponding. The main risk driver is the central cluster of rooftop equipment and associated penetrations, which increases flashing and leak potential. Overall visible condition appears good, though membrane type cannot be confirmed from aerial imagery alone. Visible risk factors include high penetration or rooftop-unit density.",
+  "recommendation": "Maintain routine roof inspections and preventive maintenance, with particular attention to equipment curbs, seams, and penetrations around the central mechanical area. Continue to monitor for staining, sealant failures, or ponding after storms. A field inspection is recommended to confirm membrane type and verify the condition of flashings and rooftop units.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 2100,
+    "cached_input_tokens": 0,
+    "output_tokens": 624,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2724
+  },
+  "visual_risk_score_cap": 74,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.8,
+  "aerial_age_score_adjustment": 0
+}

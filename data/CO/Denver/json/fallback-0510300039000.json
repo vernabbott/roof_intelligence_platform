@@ -1,0 +1,38 @@
+{
+  "source": "fallback",
+  "best_image_source": "Primary aerial imagery",
+  "roof_type": "Low-slope membrane",
+  "roof_system": "Unknown membrane",
+  "possible_roof_systems": [],
+  "roof_age_estimate": "72 years",
+  "roof_pitch": "Low slope",
+  "overall_score": 61,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 0,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": false,
+    "suspected_ponding": false,
+    "high_penetration_density": false,
+    "overhanging_trees_or_debris": false,
+    "notes": []
+  },
+  "observations": [
+    "Aerial imagery is available, but AI analysis was not run for this report.",
+    "Large low-slope roof area should be reviewed for membrane wear, drainage, staining, and penetration condition.",
+    "Use the selected aerial image as the primary visual reference for field validation."
+  ],
+  "breakdown": {
+    "Membrane Condition": 61,
+    "Ponding": 49,
+    "Flashing & Seals": 53,
+    "Penetrations": 59,
+    "Overall Maintenance": 61
+  },
+  "summary": "This preliminary report was generated from parcel/building data and aerial imagery. AI roof observations were not requested or no API key was available, so condition values are conservative placeholders for layout and workflow validation.",
+  "recommendation": "Run AI image analysis and perform field inspection before final assessment.",
+  "original_overall_score": 69,
+  "aerial_age_adjustment_applied": true,
+  "aerial_photo_age_years": 8.3,
+  "aerial_age_score_adjustment": 8
+}

@@ -1,0 +1,52 @@
+{
+  "input": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/data/CO/Jefferson/parcels/jefferson_80033_sample5_with_aerial.csv",
+  "output_dir": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report",
+  "state": "CO",
+  "county": "Jefferson",
+  "zip_code": "80033",
+  "started_at": "2026-07-10T15:35:36",
+  "ai": {
+    "requested": true,
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "allow_fallback": true
+  },
+  "counts": {
+    "rows_selected": 1,
+    "generated": 1,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 0,
+    "fallback": 1,
+    "blank_or_missing_images": 1,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "records": [
+    {
+      "row": 1,
+      "parcel": "3923200024",
+      "address": "8360 W 48TH AVE",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80033",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PCS Roof Intelligence Report/CO/80033/Reports/3923200024-8360-w-48th-ave.pdf",
+      "status": "generated",
+      "problems": [
+        "aerial image missing"
+      ],
+      "image": {
+        "exists": false,
+        "blank": true,
+        "width": 0,
+        "height": 0,
+        "brightness": 0.0,
+        "contrast": 0.0,
+        "reason": "missing"
+      },
+      "analysis_source": "fallback"
+    }
+  ],
+  "finished_at": "2026-07-10T15:35:36"
+}

@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Denver GIS aerial roof image provided by user",
+  "roof_type": "low-slope flat roof",
+  "roof_system": "likely single-ply or built-up commercial membrane roof (white reflective field; exact system not verifiable from aerial imagery)",
+  "roof_age_estimate": "likely original/older roof family for a 1972 warehouse, but apparent top-layer material may be newer than building date; estimated 10-25 years for visible membrane areas",
+  "roof_pitch": "low-slope / near-flat",
+  "overall_score": 68,
+  "condition_label": "fair",
+  "risk_level": "moderate",
+  "ai_confidence": 82,
+  "observations": [
+    "Large commercial warehouse complex with extensive low-slope roof areas.",
+    "Roof surfaces are predominantly white/light-colored, suggesting reflective membrane or coated roofing.",
+    "Visible field staining/discoloration on multiple roof sections, especially near panel joints and scattered areas.",
+    "No obvious large open holes, blow-offs, or major collapse visible from aerial view.",
+    "Multiple roof sections and seams/joints are visible, indicating a segmented roof layout with parapet/edge conditions likely requiring ongoing maintenance via the roof interface and flashings, though flashings themselves are not directly resolvable from this image alone."
+  ],
+  "breakdown": {
+    "Membrane Condition": 70,
+    "Ponding": 78,
+    "Flashing & Seals": 65,
+    "Penetrations": 66,
+    "Overall Maintenance": 67
+  },
+  "summary": "The roof appears to be a low-slope commercial membrane roof in fair condition. Visible evidence shows generally intact roof areas with moderate weathering, staining, and some localized discoloration. No severe distress is evident from the aerial image, but the age of the warehouse and the segmented roof geometry suggest maintenance attention is warranted.",
+  "recommendation": "Continue routine inspection and preventative maintenance, with emphasis on seam checks, perimeter details, and rooftop penetrations. Plan for a closer field inspection to confirm membrane type, assess patching/repairs, and verify whether any sections are approaching end-of-life.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 2436,
+    "cached_input_tokens": 0,
+    "output_tokens": 402,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2838
+  }
+}

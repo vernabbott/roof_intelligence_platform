@@ -1,0 +1,68 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo dated 11/13/2025",
+  "roof_type": "Low-slope commercial roof with multiple connected sections",
+  "roof_system": "Reflective membrane roof, likely TPO/PVC or coated membrane",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 68,
+      "evidence": "Large bright white low-slope surface with seams/patch-like lines and numerous rooftop penetrations is consistent with a single-ply reflective membrane."
+    },
+    {
+      "system": "Coating over membrane",
+      "confidence": 55,
+      "evidence": "Very light uniform roof color across broad areas could indicate a reflective coating over an existing membrane rather than bare membrane alone."
+    },
+    {
+      "system": "Modified bitumen",
+      "confidence": 28,
+      "evidence": "Flat commercial roof geometry with multiple repaired-looking areas could fit modified bitumen, though the bright white appearance is less typical without a coating."
+    }
+  ],
+  "roof_age_estimate": "Unknown from aerial imagery; visible roof surface appears maintained but with signs of patching and localized wear",
+  "roof_pitch": "Low-slope / near-flat",
+  "overall_score": 62,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 72,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": true,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Localized darkened areas and uneven tonal patches are visible on the roof surface.",
+      "Several vents, curbs, and equipment units are distributed across the roof, increasing flashing and seal risk.",
+      "Some darker areas near roof edges and transitions may indicate drainage-related staining or recurring moisture retention.",
+      "Aerial image is useful for broad condition only; small defects and seam failures may not be visible."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density.",
+    "Multiple connected low-slope roof sections are visible over the commercial building.",
+    "The roof surface is predominantly bright white, suggesting a reflective membrane or coating.",
+    "Numerous rooftop penetrations and mechanical curbs are present, especially in the central and right portions of the roof.",
+    "Several localized dark patches and discoloration areas are visible, which may reflect repairs, staining, or moisture-related wear."
+  ],
+  "breakdown": {
+    "Membrane Condition": 65,
+    "Ponding": 55,
+    "Flashing & Seals": 62,
+    "Penetrations": 58,
+    "Overall Maintenance": 64
+  },
+  "summary": "The aerial imagery shows a large low-slope commercial roof with a bright reflective surface and many rooftop penetrations. Overall the roof appears serviceable, but localized dark staining/discoloration and the number of curbs, vents, and equipment units increase leak and maintenance risk. The image suggests a maintained roof with some patching or age-related wear rather than a uniform new installation. Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density.",
+  "recommendation": "Perform a close-up roof inspection focused on seams, penetrations, curb flashings, and the darker stained areas to determine whether they reflect ponding, prior repairs, or active moisture intrusion. Verify drainage performance and check all rooftop units and flashings for seal integrity. Consider targeted maintenance or repairs where discoloration or repaired areas are concentrated. Field inspection should verify drainage, moisture, penetrations, flashing, and debris-related damage.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 2099,
+    "cached_input_tokens": 0,
+    "output_tokens": 650,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2749
+  },
+  "visual_risk_score_cap": 62,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.7,
+  "aerial_age_score_adjustment": 0
+}

@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Denver GIS aerial roof image provided by user",
+  "roof_type": "low-slope commercial roof",
+  "roof_system": "likely modified bitumen or built-up roof with gravel surfacing; flat/low-slope membrane roof",
+  "roof_age_estimate": "approximately 20-45 years old based on year built (1979) and visible aged roof appearance",
+  "roof_pitch": "very low-slope / near-flat",
+  "overall_score": 68,
+  "condition_label": "fair",
+  "risk_level": "moderate",
+  "ai_confidence": 78,
+  "observations": [
+    "Large commercial warehouse roof with consistent low-slope geometry and multiple parapet/edge conditions visible from aerial view.",
+    "Roof surface appears weathered but generally uniform; no obvious large punctures, blow-offs, or exposed substrate visible at this resolution.",
+    "Numerous small rooftop penetrations/vents are present across the field of the roof.",
+    "Some discoloration and patch-like tonal variation suggest prior maintenance or localized repairs.",
+    "No clear evidence of active ponding is visible, though drainage performance cannot be confirmed from this image alone due to resolution and angle of view."
+  ],
+  "breakdown": {
+    "Membrane Condition": 70,
+    "Ponding": 75,
+    "Flashing & Seals": 66,
+    "Penetrations": 64,
+    "Overall Maintenance": 69
+  },
+  "summary": "The roof appears to be a large, low-slope commercial membrane roof in fair condition with signs of age and routine maintenance. Visible deterioration is limited, but the number of penetrations and general weathering indicate moderate inspection and maintenance risk consistent with an older warehouse roof.",
+  "recommendation": "Schedule a close-range roof inspection focused on seams, penetrations, edge details, and drainage components. Plan for continued maintenance and consider budgetary replacement planning if this roof has not been recently restored or recoated.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 1327,
+    "cached_input_tokens": 0,
+    "output_tokens": 363,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 1690
+  }
+}

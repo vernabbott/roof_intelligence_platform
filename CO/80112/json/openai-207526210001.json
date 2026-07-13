@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Arapahoe County Aerials aerial photo dated 03/01/2024",
+  "roof_type": "Low-slope commercial roof",
+  "roof_system": "Likely single-ply membrane roof (white reflective membrane) with numerous rooftop mechanical units, curbs, and parapet/edge flashing",
+  "roof_age_estimate": "Unknown; appears moderately aged based on general wear but exact age cannot be determined from aerial imagery alone",
+  "roof_pitch": "Flat to very low slope",
+  "overall_score": 78,
+  "condition_label": "Good",
+  "risk_level": "Low to Moderate",
+  "ai_confidence": 82,
+  "observations": [
+    "Large low-slope roof appears generally uniform and intact with no obvious large tears, exposed substrate, or widespread blistering visible from aerial view.",
+    "Minor discoloration and weathering are visible in scattered areas, especially along seams, around curbs, and near some roof details.",
+    "Multiple rooftop mechanical units, vents, and penetrations are present; localized flashing/seal maintenance may be needed at these locations.",
+    "No clear evidence of significant ponding, drainage failure, or standing water is visible in the image.",
+    "Roof perimeter, parapet transitions, and equipment zones appear generally serviceable, though the image resolution limits confirmation of fine-detail conditions."
+  ],
+  "breakdown": {
+    "Membrane Condition": 80,
+    "Ponding": 88,
+    "Flashing & Seals": 74,
+    "Penetrations": 76,
+    "Overall Maintenance": 78
+  },
+  "summary": "The roof presents as a large white low-slope commercial membrane system in generally good condition from aerial inspection. Visible wear is limited to minor staining and localized aging around seams and rooftop equipment, with no apparent major distress or ponding issues.",
+  "recommendation": "Continue routine preventive maintenance and inspect all rooftop curbs, seams, and penetrations during the next service cycle. Prioritize sealant/flashing checks around mechanical units and perimeter transitions, and monitor for any developing staining or localized membrane wear.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 3170,
+    "cached_input_tokens": 0,
+    "output_tokens": 393,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 3563
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Arapahoe County Aerials aerial photo dated 03/01/2024",
+  "roof_type": "Predominantly low-slope metal roof with multiple stepped sections",
+  "roof_system": "Likely standing seam or mechanically seamed metal roof assembly over a large commercial/special-purpose facility",
+  "roof_age_estimate": "Unknown from image; appears serviceable and likely mid-life, but exact age cannot be determined from aerial evidence",
+  "roof_pitch": "Low-slope to very low-slope",
+  "overall_score": 83,
+  "condition_label": "Good",
+  "risk_level": "Low",
+  "ai_confidence": 78,
+  "observations": [
+    "Large roof area appears generally uniform and intact with no obvious widespread corrosion, puncture, or membrane failure visible from aerial view.",
+    "No significant ponding or standing water is visible on the roof surface.",
+    "Several linear seams/panels are visible; a few minor localized irregularities or scuffs can be seen, but nothing suggests acute distress.",
+    "Roof edges and transitions appear orderly; no clear evidence of major flashing separation visible at this resolution.",
+    "Minimal rooftop equipment is visible on the main field; penetrations appear limited and not obviously compromised from aerial imagery alone."
+  ],
+  "breakdown": {
+    "Membrane Condition": 85,
+    "Ponding": 95,
+    "Flashing & Seals": 80,
+    "Penetrations": 82,
+    "Overall Maintenance": 82
+  },
+  "summary": "The aerial image shows a large commercial roof that appears to be in generally good condition. The roof surface is largely uniform, with no visible widespread deterioration, ponding, or major repair areas. Minor localized surface irregularities are present, but there is no clear aerial evidence of significant roof distress.",
+  "recommendation": "Continue routine preventative maintenance and periodic inspections, with close attention to seams, transitions, and any rooftop penetrations. Consider a field inspection to verify flashing and sealant condition, especially in areas not fully resolvable from aerial imagery.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 3168,
+    "cached_input_tokens": 0,
+    "output_tokens": 389,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 3557
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo dated 11/13/2025",
+  "roof_type": "low-slope commercial roof",
+  "roof_system": "metal roof or coated metal roof (exact system not verifiable from aerial imagery alone)",
+  "possible_roof_systems": [
+    {
+      "system": "metal",
+      "confidence": 78,
+      "evidence": "Large standing-seam-like panel field with repeating vertical ribs/lines and bright reflective roof surface consistent with a metal roof from overhead."
+    },
+    {
+      "system": "coating over membrane",
+      "confidence": 32,
+      "evidence": "Uniform light-toned roof field with some localized discoloration could also reflect a coated low-slope roof, but panel/rib pattern makes this less likely."
+    }
+  ],
+  "roof_age_estimate": "appears moderate age; exact age not determinable from aerial imagery",
+  "roof_pitch": "low-slope",
+  "overall_score": 68,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 72,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": false,
+    "high_penetration_density": false,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Localized darker stains/discoloration are visible on the lighter roof section near the east/right side.",
+      "Dark roof areas along the left side appear more consistent with shadowing/adjacent tree shade than roof distress, based on shape and uniform darkness.",
+      "No obvious ponding pattern, but aerial resolution limits confirmation of drainage performance."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color.",
+    "The main roof reads as a light-colored low-slope system with visible longitudinal seams/ribs, which is most consistent with metal or a coated metal surface.",
+    "A smaller white roof section at the east/right side shows two notable dark stains/discolorations.",
+    "Perimeter and edge details are visible, but individual flashing conditions cannot be verified from this altitude.",
+    "No dense field of penetrations, skylights, or rooftop mechanical units is evident on the main roof plane."
+  ],
+  "breakdown": {
+    "Membrane Condition": 68,
+    "Ponding": 72,
+    "Flashing & Seals": 66,
+    "Penetrations": 78,
+    "Overall Maintenance": 64
+  },
+  "summary": "The 11/13/2025 Esri aerial image shows a low-slope commercial roof that appears most consistent with a metal roof, or possibly a coated metal surface, based on the reflective light-colored finish and visible panel/seam pattern. Overall condition looks serviceable, but localized discoloration on the east/right roof section and limited ability to verify edge details keep the roof in fair condition rather than good. No obvious widespread ponding or heavy rooftop equipment field is visible from this image. Visible risk factors include dark staining or inconsistent roof color.",
+  "recommendation": "Continue routine roof inspections and maintenance, with closer attention to the stained/discolored areas on the east/right section and to perimeter flashing/seal details. If not recently done, consider a field inspection to confirm whether the discoloration is cosmetic, repair-related, or associated with moisture intrusion. Monitor drainage and clean any debris from roof edges and adjacent gutters/scuppers as applicable.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 2099,
+    "cached_input_tokens": 0,
+    "output_tokens": 640,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2739
+  },
+  "visual_risk_score_cap": 72,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.7,
+  "aerial_age_score_adjustment": 0
+}

@@ -1,0 +1,73 @@
+{
+  "best_image_source": "Esri World Imagery aerial provided in prompt",
+  "roof_type": "low-slope commercial roof with multiple pitched/hipped roof sections",
+  "roof_system": "unknown from aerial; likely a mix of low-slope membrane and sloped roofing",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 38,
+      "evidence": "Several bright white low-slope roof areas are visible; uniform light surfaces are commonly consistent with single-ply membrane, though aerial imagery cannot confirm chemistry."
+    },
+    {
+      "system": "Modified bitumen",
+      "confidence": 24,
+      "evidence": "Some flat/low-slope roof areas could also be a coated or aged bituminous system; aerial detail is insufficient to distinguish from single-ply."
+    },
+    {
+      "system": "Coating over membrane",
+      "confidence": 22,
+      "evidence": "Highly reflective white roof sections may indicate an applied coating over an existing membrane, but the image does not show texture or seams clearly."
+    },
+    {
+      "system": "Metal",
+      "confidence": 18,
+      "evidence": "The numerous sloped roof forms and bright reflective surfaces could include metal panels, but panel lines are not clearly resolved in the aerial view."
+    }
+  ],
+  "roof_age_estimate": "likely mid-life to aging for a 1988 building; exact roof age not determinable from aerial imagery",
+  "roof_pitch": "predominantly low-slope with multiple steep/sloped roof sections",
+  "overall_score": 61,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 66,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": false,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": true,
+    "notes": [
+      "Localized orange/red discoloration is visible along the west-side low-slope roof area and may reflect staining, prior repair, or moisture-related discoloration.",
+      "The roof appears to have multiple sections, transitions, and likely penetrations/curbs associated with rooftop equipment and roof geometry.",
+      "Trees closely surround portions of the building, increasing debris and maintenance risk.",
+      "No clear widespread ponding was visible in the imagery, but aerial resolution limits detection of subtle drainage issues."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color, high penetration or rooftop-unit density, tree overhang or roof debris exposure.",
+    "Multiple roof planes and transitions are present across the complex, increasing flashing complexity.",
+    "Bright white roof sections dominate the image and suggest reflective roof surfaces or coating.",
+    "A distinct localized stain/discoloration is visible on the west side of the main roof mass.",
+    "Rooftop equipment/curbs and other small rooftop details appear on the central/right sections."
+  ],
+  "breakdown": {
+    "Membrane Condition": 62,
+    "Ponding": 58,
+    "Flashing & Seals": 57,
+    "Penetrations": 54,
+    "Overall Maintenance": 58
+  },
+  "summary": "This commercial property shows a mixed roof configuration with several low-slope white roof areas and multiple sloped roof sections. The visible roof surfaces appear generally serviceable, but localized discoloration, numerous transitions, rooftop details, and surrounding trees increase leak and maintenance risk. Aerial imagery alone does not confirm the roof membrane type, so the system is best treated as a probable single-ply or coated low-slope roof with other roof types also present. Visible risk factors include dark staining or inconsistent roof color, high penetration or rooftop-unit density, tree overhang or roof debris exposure.",
+  "recommendation": "Perform a closer rooftop inspection to verify membrane type, check the stained west-side area for moisture or prior repair history, review all flashings and penetrations, and clear/monitor nearby trees and debris. If not recently inspected, evaluate drainage performance and sealant condition at roof transitions and equipment curbs. Field inspection should verify drainage, moisture, penetrations, flashing, and debris-related damage.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 1349,
+    "cached_input_tokens": 0,
+    "output_tokens": 714,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2063
+  },
+  "visual_risk_score_cap": 72,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.0,
+  "aerial_age_score_adjustment": 0
+}

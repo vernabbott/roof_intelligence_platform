@@ -1,0 +1,68 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo dated 09/06/2025",
+  "roof_type": "low-slope commercial warehouse roof",
+  "roof_system": "likely single-ply membrane roof with multiple roof sections",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 48,
+      "evidence": "Large bright white roof fields on the main warehouse blocks are consistent with a reflective single-ply membrane visible from aerial imagery."
+    },
+    {
+      "system": "Coating over membrane",
+      "confidence": 32,
+      "evidence": "Overall light-colored roof appearance with localized discoloration could reflect a coated membrane, though aerial imagery cannot confirm chemistry."
+    },
+    {
+      "system": "Modified bitumen",
+      "confidence": 24,
+      "evidence": "Some tan/brown roof areas and patchy discoloration on older sections could be modified bitumen, but the image is too coarse to confirm."
+    }
+  ],
+  "roof_age_estimate": "appears mid-life to older in service, with some sections showing wear and discoloration",
+  "roof_pitch": "low-slope / near-flat",
+  "overall_score": 58,
+  "condition_label": "POOR",
+  "risk_level": "HIGH",
+  "ai_confidence": 72,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": true,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Several roof areas show dark streaks, mottled staining, and uneven color that may indicate recurring wetting, prior repairs, or localized drainage issues.",
+      "Multiple penetrations/vents are visible across the roof fields, increasing flashing and seal maintenance demand.",
+      "Some sections appear brighter and newer-looking than others, suggesting mixed roof ages or patch/recoat history.",
+      "No clear tree overhang onto the roof is visible in this image."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density.",
+    "The property is a large commercial warehouse with multiple connected roof sections and a low-slope profile.",
+    "White roof segments are visible on the main buildings, with scattered dark stains and localized discoloration across several areas.",
+    "Tan/brown roof sections on the western/northern portions appear older or differently finished than the white sections.",
+    "Numerous small rooftop penetrations are visible, including vents/curbs, especially across the larger white roof areas."
+  ],
+  "breakdown": {
+    "Membrane Condition": 56,
+    "Ponding": 54,
+    "Flashing & Seals": 57,
+    "Penetrations": 55,
+    "Overall Maintenance": 56
+  },
+  "summary": "Aerial imagery dated 09/06/2025 shows a large low-slope commercial warehouse roof with multiple connected sections and a likely single-ply membrane roof system, though exact chemistry cannot be confirmed from overhead imagery alone. The roof appears generally serviceable, but visible dark staining, uneven coloration, and several roof penetrations suggest moderate maintenance and leak-management risk. Some sections appear newer or more reflective than others, indicating possible mixed-age roof areas or prior repair/recoat work. Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density.",
+  "recommendation": "Perform a close-up rooftop inspection to verify membrane type, check all flashing and penetration seals, and evaluate the stained/darker areas for active leaks, wet insulation, or drainage-related wear. Prioritize review of older-looking roof sections and any areas with concentrated discoloration or patch history. Field inspection should verify drainage, moisture, penetrations, flashing, and debris-related damage.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 2100,
+    "cached_input_tokens": 0,
+    "output_tokens": 672,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2772
+  },
+  "visual_risk_score_cap": 62,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.8,
+  "aerial_age_score_adjustment": 0
+}

@@ -1,0 +1,35 @@
+{
+  "best_image_source": "Denver GIS aerial image provided by user",
+  "roof_type": "Low-slope commercial roof",
+  "roof_system": "Likely single-ply membrane (white reflective roof surface) over large industrial building",
+  "roof_age_estimate": "Moderate age; likely original or near-original to a 1983 building, but exact roof age cannot be confirmed from image alone",
+  "roof_pitch": "Flat to very low slope",
+  "overall_score": 76,
+  "condition_label": "Fair",
+  "risk_level": "Moderate",
+  "ai_confidence": 82,
+  "observations": [
+    "Large white membrane roof visible across the main building footprint.",
+    "Roof surface appears generally uniform with no obvious widespread tears, blow-offs, or open seams visible from aerial view.",
+    "No clear ponding or major staining is visible on the main roof field.",
+    "Multiple rooftop penetrations/vents are present and appear concentrated near the center and lower half of the roof.",
+    "Perimeter edges and transitions are not clearly detailed enough to confirm flashing condition, but no obvious failure is visible from above."
+  ],
+  "breakdown": {
+    "Membrane Condition": 78,
+    "Ponding": 85,
+    "Flashing & Seals": 72,
+    "Penetrations": 74,
+    "Overall Maintenance": 76
+  },
+  "summary": "The roof appears to be a large low-slope white membrane system serving an industrial/manufacturing facility. Visible conditions suggest generally serviceable performance with no major aerially apparent distress. Given the 1983 construction date, the roof may be older or periodically replaced; however, the image alone does not confirm age or remaining service life. Overall condition is fair with moderate risk due to roof size, age context, and multiple penetrations.",
+  "recommendation": "Continue routine maintenance and schedule a close-range roof inspection to verify membrane seams, flashings, penetrations, and rooftop equipment curbs. Consider proactive planning for future replacement if the roof is near or beyond typical service life for its system type.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 1197,
+    "cached_input_tokens": 0,
+    "output_tokens": 387,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 1584
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo provided in prompt",
+  "roof_type": "low-slope commercial roof",
+  "roof_system": "single-ply membrane roof (exact chemistry not verifiable from aerial imagery)",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 48,
+      "evidence": "Light tan/gray uniform roof fields with low-slope geometry and scattered rooftop penetrations are consistent with a single-ply membrane system, though membrane type cannot be confirmed from overhead imagery."
+    },
+    {
+      "system": "EPDM",
+      "confidence": 30,
+      "evidence": "Low-slope roof layout could also be EPDM, but the image does not show enough detail to verify seam pattern or surface texture."
+    },
+    {
+      "system": "Modified bitumen",
+      "confidence": 24,
+      "evidence": "Flat-roof form and multiple roof sections make modified bitumen possible, but there is no clear granule field or seam pattern visible at this scale."
+    },
+    {
+      "system": "Coating over membrane",
+      "confidence": 18,
+      "evidence": "The roof appears broadly uniform in color, which could reflect a coated surface, but the aerial image is not detailed enough to distinguish coating from membrane color."
+    }
+  ],
+  "roof_age_estimate": "likely original or near-original roof era for a 1971-built school, but visible material appearance suggests later replacement may have occurred; exact age not verifiable from aerial imagery",
+  "roof_pitch": "low-slope / near-flat",
+  "overall_score": 62,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 74,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": true,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": true,
+    "notes": [
+      "Several dark roof areas and linear discoloration bands are visible on otherwise light-colored roof sections; these may indicate ponding, weathering, repairs, or localized moisture retention.",
+      "Dark recesses along roof valleys/walkways create possible drainage and leak-risk zones, though some darker areas may be shadowed roof transitions.",
+      "Multiple rooftop penetrations/vents are present across the roof, increasing flashing and seal maintenance demand.",
+      "Trees closely surround portions of the building and some branches appear near roof edges, creating debris and abrasion risk."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density, tree overhang or roof debris exposure.",
+    "Large low-slope roof with multiple connected sections on a school campus.",
+    "Roof surface is generally light-colored and mostly uniform, but there are scattered darkened patches and tonal variation.",
+    "Numerous small vents/penetrations are visible across several roof areas.",
+    "Roof edges are bordered by mature trees and landscaped areas, with some overhanging proximity."
+  ],
+  "breakdown": {
+    "Membrane Condition": 65,
+    "Ponding": 55,
+    "Flashing & Seals": 64,
+    "Penetrations": 58,
+    "Overall Maintenance": 61
+  },
+  "summary": "Aerial imagery shows a large low-slope school roof that appears serviceable overall, with a generally uniform light-colored surface. Visible darkened areas, tonal irregularities, and the density of rooftop penetrations suggest moderate maintenance and leak-monitoring needs. Trees near the roof perimeter add debris and abrasion risk. Exact membrane chemistry cannot be confirmed from overhead imagery alone. Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density, tree overhang or roof debris exposure.",
+  "recommendation": "Perform a close-up roof inspection to verify membrane type, check all penetrations and flashing terminations, and evaluate the darkened areas for recurring ponding, trapped moisture, or prior repairs. Trim back overhanging vegetation where needed and confirm drainage paths remain clear. Consider preventative maintenance and targeted repairs if the darkened areas correspond to chronic wet spots or seam/flashing distress. Field inspection should verify drainage, moisture, penetrations, flashing, and debris-related damage.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 1352,
+    "cached_input_tokens": 0,
+    "output_tokens": 739,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2091
+  },
+  "visual_risk_score_cap": 62,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.0,
+  "aerial_age_score_adjustment": 0
+}
