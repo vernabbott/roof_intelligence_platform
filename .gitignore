@@ -5,5 +5,10 @@
 __pycache__/
 *.pyc
 
-# Exceeds GitHub's 100 MB per-file limit; regenerate from source data locally.
-data/CO/Denver/parcels/colorado_parcel_data.csv
+# Reproducible runtime outputs and collected property data.
+/AZ/
+/CO/
+/NC/
+/data/
+/aerial_images_arapahoe_80112_sample20/
+/tmp/
