@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # Roof Condition AI Scoring Specification
 
 **Project:** PilotPoint IQ Roof Intelligence  
