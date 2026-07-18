@@ -20,6 +20,7 @@ RAW_TABLE = "building_footprints"
 CANONICAL_TABLE = "canonical_building_footprints"
 MICROSOFT_SOURCE = "Microsoft US Building Footprints"
 MAX_BUILDINGS_PER_REQUEST = 10_000
+CANONICAL_REVALIDATION_DAYS = 30
 _ENGINE: Engine | None = None
 
 
@@ -139,6 +140,18 @@ def collect_canonical_buildings_in_envelope(
                c.resolution_status AS canonical_status, c.difference_pct,
                c.confidence AS canonical_confidence,
                c.validation_details AS canonical_validation,
+               c.updated_at AS canonical_updated_at,
+               c.updated_at < NOW() - (:revalidation_days * INTERVAL '1 day')
+                   AS canonical_revalidation_due,
+               EXISTS (
+                   SELECT 1
+                   FROM building_footprint_source_matches source_match
+                   JOIN {RAW_TABLE} source_row
+                     ON source_row.id = source_match.source_footprint_id
+                   WHERE source_match.canonical_footprint_id = c.id
+                     AND COALESCE(source_row.source_updated_at, source_row.imported_at)
+                         > c.updated_at
+               ) AS canonical_sources_changed,
                ST_AsText(b.geometry) AS building_geometry
         FROM {CANONICAL_TABLE} c
         JOIN {RAW_TABLE} b ON b.id = c.selected_source_footprint_id
@@ -151,6 +164,7 @@ def collect_canonical_buildings_in_envelope(
     params = {
         "county": county.replace(" County", ""),
         "minx": minx, "miny": miny, "maxx": maxx, "maxy": maxy, "row_limit": row_limit,
+        "revalidation_days": CANONICAL_REVALIDATION_DAYS,
     }
     with engine().connect() as connection:
         if not canonical_schema_available(connection):
@@ -181,6 +195,20 @@ def collect_buildings_in_envelope(
 
 def county_source_name(county: str) -> str:
     return f"{county.replace(' County', '')} County GIS Building Footprints"
+
+
+def canonical_needs_revalidation(record: dict | None) -> bool:
+    """Return whether an automatic Microsoft selection needs a live comparison."""
+    if not record:
+        return False
+    if record.get("canonical_status") not in {"validated", "single_source"}:
+        return False
+    if record.get("source") != MICROSOFT_SOURCE:
+        return False
+    return bool(
+        record.get("canonical_revalidation_due")
+        or record.get("canonical_sources_changed")
+    )
 
 
 def _stable_external_id(source: str, geometry_text: str) -> str:
@@ -499,7 +527,7 @@ def resolve_canonical_footprint(
 
 
 __all__ = [
-    "MICROSOFT_SOURCE", "canonical_schema_available", "collect_buildings_in_envelope",
+    "MICROSOFT_SOURCE", "canonical_needs_revalidation", "canonical_schema_available", "collect_buildings_in_envelope",
     "collect_canonical_buildings_in_envelope", "collect_source_buildings_in_envelope",
     "county_source_name", "mark_canonical_pending_review", "parse_envelope",
     "list_pending_canonical_footprints", "resolve_canonical_footprint",

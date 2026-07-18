@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import collect_denver_buildings_with_parcels as collector
+from building_footprint_store import MICROSOFT_SOURCE
 from report_footprint_validation import validate_report_row_footprints
 
 
@@ -72,6 +73,31 @@ class ReportFootprintValidationTests(unittest.TestCase):
 
         county_lookup.assert_not_called()
         self.assertEqual(result["selected_source"], "canonical")
+
+    def test_stale_automatic_canonical_record_is_revalidated(self):
+        canonical = {
+            **self.record(),
+            "canonical_id": 42,
+            "canonical_status": "validated",
+            "canonical_validation": {"status": "validated", "difference_pct": 1.0},
+            "canonical_revalidation_due": True,
+            "source": MICROSOFT_SOURCE,
+        }
+        with (
+            patch.object(collector, "collect_buildings", return_value=[canonical]),
+            patch.object(collector, "collect_secondary_buildings", return_value=[self.record()]) as county_lookup,
+            patch.object(
+                collector,
+                "validate_building_footprint_sources",
+                return_value={"status": "validated", "difference_pct": 0.0},
+            ),
+            patch("building_footprint_store.save_canonical_footprint", return_value={"canonical_id": 42}) as save,
+        ):
+            result = validate_report_row_footprints(self.row())
+
+        county_lookup.assert_called_once()
+        save.assert_called_once()
+        self.assertIn("30-day", result["warnings"][0])
 
 
 if __name__ == "__main__":

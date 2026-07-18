@@ -107,7 +107,7 @@ def validate_report_row_footprints(row: dict) -> dict:
     a hard stop.
     """
     import collect_denver_buildings_with_parcels as collector
-    from building_footprint_store import save_canonical_footprint
+    from building_footprint_store import canonical_needs_revalidation, save_canonical_footprint
 
     key = county_key(row.get("County"))
     if not key:
@@ -128,13 +128,17 @@ def validate_report_row_footprints(row: dict) -> dict:
         primary_error = " ".join(str(exc).split())[:300]
     primary = _best_overlap(polygon, primary_records)
     canonical_status = str((primary or {}).get("canonical_status") or "")
+    revalidation_due = canonical_needs_revalidation(primary)
     if canonical_status == "pending_review":
         raise RuntimeError(
             f"Building footprint discrepancy needs attention for {profile.display_name} parcel "
             f"{row.get('Parcel Number') or 'unknown'}: canonical footprint "
             f"{primary.get('canonical_id')} is pending review."
         )
-    if canonical_status in {"validated", "single_source", "manually_resolved"}:
+    if (
+        canonical_status in {"validated", "single_source", "manually_resolved"}
+        and not revalidation_due
+    ):
         county_records = []
     else:
         try:
@@ -165,7 +169,7 @@ def validate_report_row_footprints(row: dict) -> dict:
             f"({row_check['difference_pct']:.2f}% difference; 5% allowed)."
         )
 
-    if canonical_status:
+    if canonical_status and not revalidation_due:
         source_check = primary.get("canonical_validation") or {"status": canonical_status}
     else:
         source_check = (
@@ -190,7 +194,7 @@ def validate_report_row_footprints(row: dict) -> dict:
             f"({source_check['difference_pct']:.2f}% difference; 5% allowed)."
         )
     canonical = None
-    if not canonical_status:
+    if not canonical_status or revalidation_due:
         canonical = save_canonical_footprint(
             profile.display_name,
             str(row.get("Parcel Number") or ""),
@@ -200,6 +204,11 @@ def validate_report_row_footprints(row: dict) -> dict:
             address=str(row.get("Address") or row.get("Property Address") or ""),
         )
     warnings: list[str] = []
+    if revalidation_due:
+        warnings.append(
+            "The canonical Microsoft footprint was revalidated because its source data "
+            "changed or its 30-day validation window expired."
+        )
     if not primary:
         warnings.append(
             "Live footprint validation used only the county GIS source"

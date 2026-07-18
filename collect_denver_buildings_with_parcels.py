@@ -26,8 +26,8 @@ from shapely.ops import transform
 from shapely.strtree import STRtree
 from pyproj import Transformer
 
-from collect_denver_assessor_data import collect_assessor_data
-from county_config import county_profile
+from assessor_detail import canonical_report_values, fetch_assessor_details
+from county_config import assessor_sources, county_profile
 
 # TODO: integrate NOAA hail exposure data
 # TODO: integrate permit history for recent roof work
@@ -861,11 +861,6 @@ def collect_parcels(fetch_limit: int | None = None, where: str = "1=1") -> list[
         if len(features) < PAGE_SIZE:
             break
     return results
-
-
-def collect_denver_parcels(fetch_limit: int | None = None) -> list[dict]:
-    """Fetch Denver assessor parcel polygons."""
-    return collect_parcels(fetch_limit)
 
 
 def build_polygon_from_wkt(wkt_text: str) -> object | None:
@@ -1821,23 +1816,44 @@ def download_aerial_images(
     sync_primary_aerial_fields(record)
 
 
-def enrich_with_assessor(records: list[dict], assessor_records: list[dict]) -> None:
-    assessor_by_parcel = {
-        parcel_join_key(record): record
-        for record in assessor_records
-        if parcel_join_key(record)
-    }
-    matched = 0
+ASSESSOR_OUTPUT_FIELDS = {
+    "Year Built": "year_built",
+    "Effective Year Built": "effective_year_built",
+    "Property Use": "property_use",
+    "Stories": "stories",
+    "Construction Type": "construction_type",
+    "Land Value": "land_value",
+}
+
+
+def enrich_with_assessor(records: list[dict], county: str) -> None:
+    """Enrich matched buildings with exact, parcel-scoped assessor requests."""
+    records_by_parcel: dict[str, list[dict]] = {}
     for record in records:
-        key = parcel_join_key(record)
-        assessor = assessor_by_parcel.get(key)
-        if not assessor:
+        parcel_id = parcel_join_key(record)
+        if parcel_id:
+            records_by_parcel.setdefault(parcel_id, []).append(record)
+
+    matched = 0
+    warning_count = 0
+    for parcel_id, parcel_records in records_by_parcel.items():
+        result = fetch_assessor_details(county, [parcel_id])
+        values = canonical_report_values(result.records)
+        warning_count += len(result.warnings)
+        if not values:
             continue
-        for field, value in assessor.items():
-            if value not in (None, ""):
-                record[field] = value
-        matched += 1
-    print(f"Matched {matched} records to assessor data by parcel number")
+        for record in parcel_records:
+            for report_field, value in values.items():
+                output_field = ASSESSOR_OUTPUT_FIELDS.get(report_field)
+                if output_field and record.get(output_field) in (None, "", 0, "0"):
+                    record[output_field] = value
+            record["_assessor_source_counts"] = dict(result.source_counts)
+            record["_assessor_warnings"] = list(result.warnings)
+            matched += 1
+    print(
+        f"Matched {matched} records using {len(records_by_parcel)} bounded assessor lookups"
+        + (f" ({warning_count} service warnings)" if warning_count else "")
+    )
 
 
 def combine_data(buildings: list[dict], parcels: list[dict]) -> list[dict]:
@@ -2372,7 +2388,7 @@ def main() -> int:
 
     min_sq = float(args.min_squares if args.min_squares is not None else 50)
     image_dir = args.image_dir or os.path.join(os.path.dirname(os.path.abspath(args.output)), "aerial_images")
-    if args.parcel_scan_buildings and args.max_output_records and not profile.assessor_url:
+    if args.parcel_scan_buildings and args.max_output_records and not assessor_sources(profile.key):
         print("Scanning individual parcels until enough filtered output rows are written...")
         counts = write_filtered_csv_by_parcel_scan(
             parcels,
@@ -2399,7 +2415,7 @@ def main() -> int:
         print(f"Saved results to {args.output}")
         return 0
 
-    if args.max_output_records and not profile.assessor_url and not args.limit:
+    if args.max_output_records and not assessor_sources(profile.key) and not args.limit:
         print("Streaming buildings until enough filtered output rows are written...")
         counts = write_filtered_csv_streaming(
             parcels,
@@ -2434,20 +2450,9 @@ def main() -> int:
     combined = combine_data(buildings, parcels)
 
     if not args.skip_assessor:
-        if profile.assessor_url:
-            print("Loading assessor records...")
-            all_assessor_records = collect_assessor_data(profile.assessor_url)
-            parcel_keys = {parcel_join_key(parcel) for parcel in parcels if parcel_join_key(parcel)}
-            assessor_records = [
-                record
-                for record in all_assessor_records
-                if parcel_join_key(record) in parcel_keys
-            ]
-            print(f"  Found {len(all_assessor_records)} assessor records before ZIP/parcel filtering")
-            print(f"  Using {len(assessor_records)} assessor records after ZIP/parcel filtering")
-            enrich_with_assessor(combined, assessor_records)
-            for record in combined:
-                add_output_fields(record)
+        if assessor_sources(profile.key):
+            print("Loading bounded assessor details for matched parcels...")
+            enrich_with_assessor(combined, profile.key)
         else:
             print(f"Skipping assessor enrichment; {profile.display_name} has no assessor source configured.")
 

@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import assessor_detail
+import collect_denver_buildings_with_parcels as collector
 from county_config import ASSESSOR_SOURCES, AssessorSource, assessor_sources
 
 
@@ -35,6 +36,23 @@ class AssessorConfigurationTests(unittest.TestCase):
 
 
 class AssessorLookupTests(unittest.TestCase):
+    def test_bulk_enrichment_uses_one_bounded_lookup_per_matched_parcel(self):
+        records = [
+            {"SCHEDNUM": "123", "year_built": ""},
+            {"SCHEDNUM": "123", "year_built": ""},
+        ]
+        result = assessor_detail.AssessorDetailResult(
+            county="denver",
+            requested_parcels=["123"],
+            records=[{"ORIG_YOC": 1999}],
+            source_counts={"denver_property": 1},
+        )
+        with patch.object(collector, "fetch_assessor_details", return_value=result) as fetch:
+            collector.enrich_with_assessor(records, "denver")
+
+        fetch.assert_called_once_with("denver", ["123"])
+        self.assertEqual([record["year_built"] for record in records], [1999, 1999])
+
     def test_arcgis_query_is_bounded_to_exact_identifiers(self):
         source = AssessorSource(
             key="test",

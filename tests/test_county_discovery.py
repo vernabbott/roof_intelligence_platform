@@ -37,6 +37,23 @@ class CountyDiscoveryProfileTests(unittest.TestCase):
 
 
 class BuildingFootprintStoreTests(unittest.TestCase):
+    def test_only_automatic_microsoft_canonical_records_are_revalidated(self):
+        base = {
+            "canonical_status": "validated",
+            "source": building_footprint_store.MICROSOFT_SOURCE,
+        }
+        self.assertFalse(building_footprint_store.canonical_needs_revalidation(base))
+        self.assertTrue(
+            building_footprint_store.canonical_needs_revalidation(
+                {**base, "canonical_revalidation_due": True}
+            )
+        )
+        self.assertFalse(
+            building_footprint_store.canonical_needs_revalidation(
+                {**base, "canonical_status": "manually_resolved", "canonical_sources_changed": True}
+            )
+        )
+
     def test_parse_envelope_rejects_unbounded_or_reversed_input(self):
         with self.assertRaisesRegex(ValueError, "four-number"):
             building_footprint_store.parse_envelope("1,2,3")

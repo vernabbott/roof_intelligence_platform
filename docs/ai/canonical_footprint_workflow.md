@@ -48,6 +48,11 @@ Resolved decisions are reused by single-address, map, standalone, and bulk
 report paths. Report-time comparison remains a safety net for properties that
 have not yet been reconciled or whose source data changed.
 
+Automatic canonical selections backed by Microsoft footprints are compared
+with the bounded county source again when a linked raw source changes or when
+the canonical decision is more than 30 days old. Manual county selections are
+not silently replaced by this automatic refresh.
+
 Official county sources are cached only for selected or reconciled properties.
 The four available layers contain roughly 1.34 million rows, so a full duplicate
 county warehouse is intentionally avoided. The bounded importer remains

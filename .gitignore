@@ -12,4 +12,8 @@ __pycache__/
 /data/*
 !/data/scripts/
 /aerial_images_arapahoe_80112_sample20/
+/aerial_images_single_address/
+/roof_ai_analysis_cache/
+/roof_intelligence_reports/
 /tmp/
+*.bak
