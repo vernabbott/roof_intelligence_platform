@@ -1,0 +1,112 @@
+schema_version: 1
+workflow_version: "1.3"
+classification_guide: docs/ai/roof_type_classification.md
+maximum_candidate_types: 5
+
+confusion_groups:
+  - [epdm, mod_bit]
+  - [ballasted, tar_and_gravel]
+
+roof_types:
+  tpo:
+    label: TPO
+    enabled: true
+    aliases: [thermoplastic polyolefin, white tpo]
+    guide: docs/ai/roof_reference_library/tpo/tpo_roof_identification.md
+    reference_images:
+      - docs/ai/roof_reference_library/tpo/images/tpo_001.jpg
+      - docs/ai/roof_reference_library/tpo/images/tpo_002.jpeg
+      - docs/ai/roof_reference_library/tpo/images/tpo_003.jpeg
+      - docs/ai/roof_reference_library/tpo/images/tpo_004.jpeg
+      - docs/ai/roof_reference_library/tpo/images/tpo_004.jpg
+    stage2_images:
+      - docs/ai/roof_reference_library/tpo/images/tpo_003.jpeg
+      - docs/ai/roof_reference_library/tpo/images/tpo_004.jpg
+
+  pvc:
+    label: PVC
+    enabled: true
+    aliases: [polyvinyl chloride, vinyl membrane]
+    guide: docs/ai/roof_reference_library/pvc/pvc_roof_identification.md
+    reference_images:
+      - docs/ai/roof_reference_library/pvc/images/pvc_001.jpeg
+      - docs/ai/roof_reference_library/pvc/images/pvc_002.jpeg
+      - docs/ai/roof_reference_library/pvc/images/pvc_004.jpeg
+      - docs/ai/roof_reference_library/pvc/images/pvc_005.jpeg
+    stage2_images:
+      - docs/ai/roof_reference_library/pvc/images/pvc_001.jpeg
+      - docs/ai/roof_reference_library/pvc/images/pvc_005.jpeg
+
+  epdm:
+    label: EPDM
+    enabled: true
+    aliases: [rubber membrane, black rubber roof]
+    guide: docs/ai/roof_reference_library/epdm/epdm_roof_identification.md
+    reference_images:
+      - docs/ai/roof_reference_library/epdm/images/epdm_001.jpg
+      - docs/ai/roof_reference_library/epdm/images/epdm_002.JPG
+      - docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg
+      - docs/ai/roof_reference_library/epdm/images/epdm_004.jpg
+    stage2_images:
+      - docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg
+      - docs/ai/roof_reference_library/epdm/images/epdm_004.jpg
+
+  ballasted:
+    label: Ballasted roof
+    enabled: true
+    aliases: [ballasted membrane, stone ballasted, paver covered]
+    guide: docs/ai/roof_reference_library/ballasted/ballasted_roof_identification.md
+    reference_images:
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_001.jpg
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_002.jpg
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_003.jpg
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_004.jpg
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_005.jpg
+    stage2_images:
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_003.jpg
+      - docs/ai/roof_reference_library/ballasted/images/ballasted_005.jpg
+
+  metal:
+    label: Metal
+    enabled: true
+    aliases: [standing seam metal, ribbed metal, corrugated metal]
+    guide: docs/ai/roof_reference_library/metal/metal_roof_identification.md
+    reference_images:
+      - docs/ai/roof_reference_library/metal/images/metal_001.jpeg
+      - docs/ai/roof_reference_library/metal/images/metal_002.jpeg
+      - docs/ai/roof_reference_library/metal/images/metal_003.jpeg
+      - docs/ai/roof_reference_library/metal/images/metal_004.jpeg
+      - docs/ai/roof_reference_library/metal/images/metal_005.jpeg
+      - docs/ai/roof_reference_library/metal/images/metal_006.jpeg
+    stage2_images:
+      - docs/ai/roof_reference_library/metal/images/metal_001.jpeg
+      - docs/ai/roof_reference_library/metal/images/metal_005.jpeg
+
+  mod_bit:
+    label: Modified bitumen
+    enabled: true
+    aliases: [modified bitumen, mod bit, asphaltic roll roofing]
+    guide: docs/ai/roof_reference_library/mod_bit/mod_bit_roof_identification.md
+    reference_images:
+      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_001.jpg
+      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_002.jpeg
+      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_003.jpeg
+      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg
+    stage2_images:
+      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_001.jpg
+      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg
+
+  tar_and_gravel:
+    label: Tar and gravel / BUR
+    enabled: true
+    aliases: [tar and gravel, built-up roofing, bur, aggregate surfaced]
+    guide: docs/ai/roof_reference_library/tar_and_gravel/tar_and_gravel_roof_identification.md
+    reference_images:
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_001.jpeg"
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_002.jpeg"
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_003.jpeg"
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_004.jpeg"
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_005.jpeg"
+    stage2_images:
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_004.jpeg"
+      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_005.jpeg"

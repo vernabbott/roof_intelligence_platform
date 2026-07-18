@@ -1,0 +1,51 @@
+{
+  "input": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/parcels/jefferson_80228_buildings_with_parcels.csv",
+  "output_dir": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1",
+  "state": "CO",
+  "county": "Jefferson",
+  "zip_code": "80228",
+  "started_at": "2026-07-14T15:46:40",
+  "ai": {
+    "requested": true,
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "allow_fallback": true,
+    "roof_reference_classification": true
+  },
+  "counts": {
+    "rows_selected": 1,
+    "generated": 1,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 1,
+    "fallback": 0,
+    "blank_or_missing_images": 0,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "records": [
+    {
+      "row": 7,
+      "parcel": "4917105011",
+      "address": "12043 W ALAMEDA PKWY",
+      "state": "CO",
+      "county": "Jefferson",
+      "zip_code": "80228",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/CO/80228/Reports/4917105011-12043-w-alameda-pkwy.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 640,
+        "height": 640,
+        "brightness": 143.79,
+        "contrast": 54.76,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    }
+  ],
+  "finished_at": "2026-07-14T15:47:09"
+}

@@ -1,0 +1,64 @@
+{
+  "best_image_source": "Denver GIS aerial photo dated 03/11/2018 - 03/17/2018",
+  "roof_type": "Low-slope commercial warehouse roof",
+  "roof_system": "Primary roof field appears to be a low-slope membrane roof, with likely white single-ply or coated membrane on the south/east building and dark low-slope membrane on the north/east building; exact chemistry is not fully resolvable from aerial imagery alone.",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 67,
+      "evidence": "Light/white smooth low-slope field on the south/east building is consistent with a reflective single-ply membrane seen in aerial view."
+    },
+    {
+      "system": "EPDM",
+      "confidence": 63,
+      "evidence": "Dark, uniform flat roof field on the north/east building is consistent with a black single-ply membrane from overhead imagery."
+    },
+    {
+      "system": "Coating over membrane",
+      "confidence": 58,
+      "evidence": "The bright white roof field could also represent a coated low-slope membrane, but aerial-only imagery cannot confirm the base system."
+    }
+  ],
+  "roof_age_estimate": "Likely original-era or older low-slope commercial roofing consistent with a 1971 industrial building, though apparent surface condition suggests at least some areas may have been resurfaced or replaced since original construction.",
+  "roof_pitch": "Flat / very low slope",
+  "overall_score": 72,
+  "condition_label": "Fair",
+  "risk_level": "Moderate",
+  "ai_confidence": 74,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": false,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Dark uniform roof areas and isolated discoloration are visible on the darker roof field; these may reflect membrane aging, staining, or prior repairs.",
+      "Several rooftop penetrations/equipment curbs are visible, increasing flashing and seal risk on a low-slope commercial roof.",
+      "No strong aerial evidence of significant ponding or heavy debris accumulation is visible in this image.",
+      "The photo date is 03/11/2018 - 03/17/2018; older imagery may understate current deterioration."
+    ]
+  },
+  "observations": [
+    "Industrial warehouse property with multiple flat/low-slope roof sections.",
+    "One roof field appears dark and uniform; another appears bright white, indicating different roof surfaces or a reflective surface treatment.",
+    "Multiple rooftop penetrations are visible, including small vents/curbs and mechanical-related protrusions.",
+    "Perimeter drainage and edge conditions are visible but not clearly showing severe blockage from the aerial view.",
+    "No obvious tree overhang onto the roof is visible in this image."
+  ],
+  "breakdown": {
+    "Membrane Condition": 70,
+    "Ponding": 75,
+    "Flashing & Seals": 68,
+    "Penetrations": 66,
+    "Overall Maintenance": 70
+  },
+  "summary": "Aerial imagery dated 03/11/2018 - 03/17/2018 shows a low-slope industrial warehouse roof with mixed roof field appearances: one dark membrane field and one bright white reflective field. Visible condition appears generally serviceable, but the darkened roof area and isolated discoloration suggest aging, prior repair activity, or localized moisture-related staining potential. Multiple penetrations and rooftop details increase flashing and seal risk. No clear severe ponded",
+  "recommendation": "Have a qualified commercial roofing contractor perform an onsite inspection, including moisture testing where warranted, to confirm the roof system, identify any required repairs, and verify whether a silicone roof restoration is appropriate for the apparently restorable low-slope areas before considering overlay or replacement. A properly designed and installed silicone system can reduce tear-off waste, cost, and disruption, create a seamless monolithic white reflective cool-roof surface, withstand ponding water when properly designed and installed, improve UV and hail resistance, and may qualify for a manufacturer warranty of up to 20 years. If onsite findings show widespread moisture, failed insulation, structural or deck deterioration, or incompatible substrate conditions, pursue overlay or full replacement evaluation instead.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 1502,
+    "cached_input_tokens": 0,
+    "output_tokens": 818,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2320
+  }
+}

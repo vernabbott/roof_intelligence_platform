@@ -1,0 +1,309 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo dated 11/13/2025",
+  "roof_type": "Mixed roof types",
+  "roof_system": "Mixed roof types: TPO, PVC or Coated Roof",
+  "possible_roof_systems": [
+    {
+      "system": "tpo",
+      "confidence": 56,
+      "evidence": "Large central roof field is smooth, light-colored, and membrane-like with faint linear seam/lap indications; the aerial view supports a white single-ply roof but does not resolve details to separate TPO from PVC or coating."
+    },
+    {
+      "system": "pvc_or_coating",
+      "confidence": 49,
+      "evidence": "The smaller attached bright white roof section has a uniform monolithic look with localized discoloration/repair-like dark spots; a PVC membrane or coated roof is plausible, but the image does not separate the two."
+    },
+    {
+      "system": "epdm_or_mod_bit",
+      "confidence": 28,
+      "evidence": "Some faint darker linear marks and weathering artifacts could be read as another membrane family, but the roof does not show the broad dark matte field needed to favor a dark single-ply system."
+    }
+  ],
+  "roof_age_estimate": "Likely mid-life to older low-slope roof based on discoloration, faint seam visibility, and localized weathering; exact age unknown from aerial imagery.",
+  "roof_pitch": "Low-slope / flat",
+  "overall_score": 54,
+  "condition_label": "POOR",
+  "risk_level": "HIGH",
+  "ai_confidence": 56,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": true,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Localized dark stains/discoloration are visible on the bright white attached roof section.",
+      "Uneven roof color and faint linear marks suggest weathering and possible prior repairs or drainage-related staining.",
+      "Several rooftop penetrations/equipment curbs are visible across the roof, increasing flashing and leak risk on a low-slope assembly.",
+      "No clear overhanging trees or roof debris are visible from this aerial view."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density.",
+    "Main central roof field is a large smooth light membrane-like area with faint linear seam/lap patterns.",
+    "Right/east attached roof section is brighter white and visually distinct from the main field.",
+    "Localized dark blotches/discoloration are visible on the attached white section.",
+    "Multiple rooftop units, vents, and curbs are present, creating numerous flashing locations."
+  ],
+  "breakdown": {
+    "Membrane Condition": 58,
+    "Ponding": 52,
+    "Flashing & Seals": 50,
+    "Penetrations": 48,
+    "Overall Maintenance": 53
+  },
+  "summary": "Esri World Imagery dated 11/13/2025 shows a mixed low-slope commercial roof at 6345 Colorado Blvd, Commerce City, CO. The dominant field appears to be a smooth light single-ply membrane, best fit TPO from aerial evidence, while the attached bright white section could be TPO, PVC, or a coated roof. Visible risk factors include dark staining or inconsistent roof color, possible ponding or drainage stress, high penetration or rooftop-unit density.",
+  "recommendation": "Have a qualified commercial roof-coating contractor or membrane roofing contractor perform an onsite inspection, moisture testing where warranted, and confirmation of the roof system, flashing details, repairs, and warranty eligibility, then provide a reliable project-price proposal. Because the roof appears to be a restorable low-slope membrane system rather than asphalt shingles, evaluate whether a silicone roof restoration is feasible before considering overlay or replacement; a qualifying silicone system may reduce tear-off waste, cost, and disruption, create a seamless monolithic white reflective cool-roof surface, withstand ponding water when properly designed and installed, improve resistance to UV exposure and hail, and may qualify for a manufacturer warranty of up to 20 years. If onsite inspection finds widespread moisture, failed insulation, deck/structural deterioration, or an incompatible substrate, prioritize overlay or re,",
+  "building_classification": "mixed",
+  "roof_zones": [
+    {
+      "zone_id": "zone_1",
+      "location": "main central roof field",
+      "roof_type": "tpo",
+      "estimated_area_percentage": 75,
+      "confidence": 56,
+      "supporting_cues": [
+        "Large smooth light-colored low-slope field",
+        "Faint linear seam/lap-like marks",
+        "Uniform membrane-like appearance across the dominant roof area"
+      ],
+      "alternatives": [
+        "pvc_or_coating",
+        "unknown"
+      ],
+      "limitations": [
+        "Aerial resolution is too soft to resolve weld seams, lap widths, or coating/application patterns.",
+        "Color and smoothness alone cannot confirm exact membrane chemistry."
+      ]
+    },
+    {
+      "zone_id": "zone_2",
+      "location": "east/right attached roof section",
+      "roof_type": "pvc_or_coating",
+      "estimated_area_percentage": 25,
+      "confidence": 49,
+      "supporting_cues": [
+        "Smaller attached bright white roof field",
+        "Monolithic smooth appearance",
+        "Localized dark staining/discoloration and repair-like mottling"
+      ],
+      "alternatives": [
+        "tpo",
+        "unknown"
+      ],
+      "limitations": [
+        "The image does not resolve whether the finish is PVC membrane or a coating over another substrate.",
+        "Edge and flashing details are visible only in soft aerial detail."
+      ]
+    }
+  ],
+  "source": "openai",
+  "usage": {
+    "input_tokens": 37498,
+    "cached_input_tokens": 0,
+    "output_tokens": 1629,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 39127,
+    "by_stage": {
+      "candidate_classification": {
+        "input_tokens": 4028,
+        "cached_input_tokens": 0,
+        "output_tokens": 533,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 4561
+      },
+      "reference_comparison": {
+        "input_tokens": 33470,
+        "cached_input_tokens": 0,
+        "output_tokens": 1096,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 34566
+      }
+    }
+  },
+  "reference_workflow": {
+    "enabled": true,
+    "status": "completed",
+    "workflow_version": "1.3",
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "manifest": {
+      "path": "docs/ai/roof_reference_manifest.yaml",
+      "sha256": "6b8f70c8e9d7c12c0dc90de7d3f519b2af97648a6d1123db9342743d3ae8c76e",
+      "size_bytes": 5108,
+      "modified_ns": 1784057940241686792
+    },
+    "classification_guide": {
+      "path": "docs/ai/roof_type_classification.md",
+      "sha256": "3f248c0997129e3fcbd9bd0bf2011911d90abd1c6c5a21ce9c660918e12ac22d",
+      "size_bytes": 11486,
+      "modified_ns": 1784057940342071149
+    },
+    "guides": [
+      {
+        "path": "docs/ai/roof_reference_library/tpo/tpo_roof_identification.md",
+        "sha256": "cb2a6834badfcd9521248af37826034717c2f6b73ab2165e9ce1a9f327c45f3c",
+        "size_bytes": 13863,
+        "modified_ns": 1784057940641746422
+      },
+      {
+        "path": "docs/ai/roof_reference_library/mod_bit/mod_bit_roof_identification.md",
+        "sha256": "d95a7e78486519366c8b6c1bca0dd02c0c557e7b5f609c31afd579d7e3b0292b",
+        "size_bytes": 9127,
+        "modified_ns": 1784057658309301293
+      },
+      {
+        "path": "docs/ai/roof_reference_library/ballasted/ballasted_roof_identification.md",
+        "sha256": "d7f0a292cfa3d3787e4f0c17934f18d34d5a620a83b02d898cc0e20eecb04129",
+        "size_bytes": 13928,
+        "modified_ns": 1784053578815000078
+      },
+      {
+        "path": "docs/ai/roof_reference_library/epdm/epdm_roof_identification.md",
+        "sha256": "20236c62f49c5bc47050b6a3eab7acfc714a95c9c88cfcef232f1c1afe134352",
+        "size_bytes": 10857,
+        "modified_ns": 1784057658209187811
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tar_and_gravel/tar_and_gravel_roof_identification.md",
+        "sha256": "e2a7a5440340c42ad55e5807198e15d83997d175bc7fc737b5bb64e6f2a90cca",
+        "size_bytes": 9251,
+        "modified_ns": 1784044432600625682
+      }
+    ],
+    "reference_images": [
+      {
+        "path": "docs/ai/roof_reference_library/tpo/images/tpo_003.jpeg",
+        "sha256": "b8bf4a1267d0e787f9eb30338792bf3136ec29bb4dc1dd38a8d46de037e0b776",
+        "size_bytes": 29129,
+        "modified_ns": 1783982796960450243
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tpo/images/tpo_004.jpg",
+        "sha256": "1071eba893a0b224dfacefd60e0877e6c4747ad0b51aad18965d56bd5a9ef15f",
+        "size_bytes": 487595,
+        "modified_ns": 1784038229983779091
+      },
+      {
+        "path": "docs/ai/roof_reference_library/mod_bit/images/mod_bit_001.jpg",
+        "sha256": "ce33ba9986e8ce3ea6abbae4a27bb2522e45e2f3b610eabcc93ddadccf4b61ae",
+        "size_bytes": 573394,
+        "modified_ns": 1784039070148285278
+      },
+      {
+        "path": "docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg",
+        "sha256": "00921c84ae58d798aae08ffa04b508c85bf80cccb13c1c263a4c6c00106a612c",
+        "size_bytes": 34188,
+        "modified_ns": 1784039258421680913
+      },
+      {
+        "path": "docs/ai/roof_reference_library/ballasted/images/ballasted_003.jpg",
+        "sha256": "d79ff00786825b1cbe7a4d8ef89deb24ae998235cbd4732b5e96c072482529da",
+        "size_bytes": 871018,
+        "modified_ns": 1784036531414910055
+      },
+      {
+        "path": "docs/ai/roof_reference_library/ballasted/images/ballasted_005.jpg",
+        "sha256": "dd2a2e19e1e3f85f6b7f272e6f17230ef1a7cc4f55045b704aa53ab43512ede4",
+        "size_bytes": 1363758,
+        "modified_ns": 1784050810180097555
+      },
+      {
+        "path": "docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg",
+        "sha256": "aa7982fa734abebd215ae18b2a93db45ee20f5a0252be3c426c820da4332bb2b",
+        "size_bytes": 125994,
+        "modified_ns": 1783983241876001266
+      },
+      {
+        "path": "docs/ai/roof_reference_library/epdm/images/epdm_004.jpg",
+        "sha256": "ed70739a15effb59979ac1a5d9e454925353569ce11fcd7508bfaee5c0dba4ec",
+        "size_bytes": 565477,
+        "modified_ns": 1784038532673316747
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_004.jpeg",
+        "sha256": "ae6cf5eb5feaa74d7df519ea288741c40dff42c8c25948d22c6718aeca1b2c38",
+        "size_bytes": 245508,
+        "modified_ns": 1784039694074052514
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_005.jpeg",
+        "sha256": "09bff2aebb631dc48f3a408568b5f56197ed64d8fa9228a6d59a7971b5f86a6e",
+        "size_bytes": 816291,
+        "modified_ns": 1784039649886059960
+      }
+    ],
+    "stage1": {
+      "building_classification": "mixed",
+      "roof_zones": [
+        {
+          "zone_id": "zone_1",
+          "location": "main central large roof field",
+          "estimated_area_percentage": 75,
+          "candidates": [
+            {
+              "roof_type": "tpo",
+              "confidence": 58,
+              "evidence": "Large smooth light/white low-slope field with broad membrane-like appearance; faint linear marks suggest sheet laps or weathering, but the image is too soft to resolve seam details needed to separate TPO from PVC or coating."
+            },
+            {
+              "roof_type": "pvc",
+              "confidence": 42,
+              "evidence": "Same light uniform roof field could be PVC membrane, but there are no clear markings, seam characteristics, or edge details to confirm it from this aerial image."
+            },
+            {
+              "roof_type": "coating",
+              "confidence": 34,
+              "evidence": "A reflective or coated surface is possible because the roof reads as a light monolithic field, but the imagery does not show application pattern, patching, or substrate telegraphing clearly enough to support it confidently."
+            }
+          ],
+          "limitations": [
+            "Image resolution and sharpness are insufficient to resolve weld seams, lap width, or surface application pattern.",
+            "Color alone is not enough to distinguish TPO, PVC, and coating; confidence is capped accordingly."
+          ]
+        },
+        {
+          "zone_id": "zone_2",
+          "location": "east/right attached roof addition",
+          "estimated_area_percentage": 25,
+          "candidates": [
+            {
+              "roof_type": "tpo",
+              "confidence": 57,
+              "evidence": "Attached bright white smooth low-slope zone with a membrane-like finish; however, seams and surface detail are not resolved well enough to distinguish TPO from PVC or coating."
+            },
+            {
+              "roof_type": "pvc",
+              "confidence": 41,
+              "evidence": "Uniform white appearance and smooth field could fit PVC, but the aerial lacks the close detail needed for a firmer call."
+            },
+            {
+              "roof_type": "coating",
+              "confidence": 33,
+              "evidence": "A coated roof is possible, especially given the bright monolithic look, but there is no clear evidence of coating texture, wear-through, or irregular application pattern."
+            }
+          ],
+          "limitations": [
+            "The zone is visually distinct from the main roof but the imagery still does not resolve the cues needed for exact membrane chemistry.",
+            "Visible roof-edge details and seams are too soft to raise confidence above the conservative cap."
+          ]
+        }
+      ],
+      "overall_limitations": [
+        "Aerial image sharpness/resolution is limited for material discrimination; seams, ribs, and application patterns are not clearly resolved.",
+        "The roof appears to have at least two materially different low-slope zones, but both are interpreted conservatively due to insufficient close detail.",
+        "Overall confidence is capped at 60 because the leading type rests on unresolved details in poor imagery."
+      ]
+    },
+    "selected_reference_types": [
+      "tpo",
+      "mod_bit",
+      "ballasted",
+      "epdm",
+      "tar_and_gravel"
+    ]
+  },
+  "visual_risk_score_cap": 62,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.7,
+  "aerial_age_score_adjustment": 0
+}

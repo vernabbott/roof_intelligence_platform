@@ -9,6 +9,7 @@ __pycache__/
 /AZ/
 /CO/
 /NC/
-/data/
+/data/*
+!/data/scripts/
 /aerial_images_arapahoe_80112_sample20/
 /tmp/

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import csv
 import hashlib
 import json
@@ -21,9 +22,32 @@ from urllib.request import Request, urlopen
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
 
+from assessor_detail import normalize_identifier, validate_assessor_footprint
+from pcs_request_workflow import (
+    apply_assessor_result_to_row,
+    fetch_request_assessor_details,
+    filter_selected_rows,
+    parse_pcs_request,
+)
+
 from roof_replacement_cost_estimator import (
     CostConfidenceInputs,
+    cost_estimation_disclaimer,
+    estimate_roof_coating_cost,
     estimate_roof_replacement_cost,
+)
+from report_summary_config import REPORT_SUMMARY_CONFIG, append_with_limit
+from roof_information_config import ROOF_INFORMATION_CONFIG, roof_system_card_text
+from report_footprint_validation import validate_report_row_footprints
+from roof_reference_config import (
+    LoadedRoofReference,
+    RoofReferenceConfig,
+    load_reference_bundle,
+    load_roof_reference_config,
+    relative_project_path,
+    roof_reference_feature_enabled,
+    roof_reference_trace,
+    select_reference_types,
 )
 
 
@@ -113,6 +137,11 @@ def format_aerial_photo_date(value: object) -> str:
 def aerial_photo_dates(value: object) -> list[date]:
     dates: list[date] = []
     for token in normalize_text(value).replace(",", " ").split():
+        if len(token) == 4 and token.isdigit():
+            # Some official imagery services publish only a project year. Use
+            # year end so age scoring does not overstate how old it may be.
+            dates.append(date(int(token), 12, 31))
+            continue
         if len(token) != 8 or not token.isdigit():
             continue
         try:
@@ -320,23 +349,22 @@ def fallback_analysis(row: dict, best_source: str) -> dict:
             "Penetrations": max(50, score - 2),
             "Overall Maintenance": score,
         },
-        "summary": (
-            "This preliminary report was generated from parcel/building data and aerial imagery. "
-            "AI roof observations were not requested or no API key was available, so condition values "
-            "are conservative placeholders for layout and workflow validation."
-        ),
-        "recommendation": "Run AI image analysis and perform field inspection before final assessment.",
+        "summary": REPORT_SUMMARY_CONFIG.fallback_summary,
+        "recommendation": REPORT_SUMMARY_CONFIG.fallback_recommendation,
     }
 
 
-def encode_image_data_url(path: Path) -> str:
-    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
-    data = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{data}"
-
-
 def image_mime_type(path: Path) -> str:
-    return "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    return {
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }.get(path.suffix.lower(), "image/jpeg")
+
+
+def encode_image_data_url(path: Path) -> str:
+    data = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{image_mime_type(path)};base64,{data}"
 
 
 def encode_image_base64(path: Path) -> str:
@@ -348,7 +376,6 @@ def analysis_prompt(row: dict) -> str:
     return (
         f"Analyze this {source_label} aerial roof image for a commercial roof intelligence report. "
         "Use only visible image evidence and the provided property metadata. Return JSON only. "
-        "Keep the narrative summary broad and avoid overstating exact membrane chemistry from aerial imagery alone. "
         "When visible evidence supports it, include possible roof system candidates such as TPO/PVC, EPDM, "
         "tar and gravel/BUR, modified bitumen, metal, ballasted membrane, or coating over membrane. "
         "For possible_roof_systems, list only systems supported by image evidence; use confidence values that reflect "
@@ -363,13 +390,9 @@ def analysis_prompt(row: dict) -> str:
         "drainage, and moisture-retention risk and should reduce Overall Maintenance and be noted. "
         "Use the full 0-100 scoring range: clean, uniform, well-drained roofs can score 80+, but visible ponding/staining "
         "or many leak-prone details should generally move the score into fair or poor territory. "
-        "Include these concerns in visual_risk_factors, observations, summary, and recommendation when present. "
-        "The aerial photo date may be older than the report date; note that older imagery can understate "
-        "current deterioration, but do not apply a separate numerical age penalty to overall_score because "
-        "the reporting system adjusts final scores for elapsed time after the image date. If a formatted aerial "
-        "photo date is provided in metadata, reference that exact date instead of saying 'if the imagery is older'. "
-        "Only use conditional age language when the aerial photo date is missing or unknown. "
-        "Do not include underwriting snapshot or carrier appetite. Property metadata: "
+        f"Report-summary and recommendation requirements: {REPORT_SUMMARY_CONFIG.ai_guidance} "
+        f"Roof Information requirements: {ROOF_INFORMATION_CONFIG.ai_guidance} "
+        "Property metadata: "
         + json.dumps(
             {
                 "address": row.get("Address"),
@@ -454,8 +477,11 @@ def analysis_schema() -> dict:
                     "Overall Maintenance",
                 ],
             },
-            "summary": {"type": "string"},
-            "recommendation": {"type": "string"},
+            "summary": {"type": "string", "maxLength": REPORT_SUMMARY_CONFIG.summary_max_characters},
+            "recommendation": {
+                "type": "string",
+                "maxLength": REPORT_SUMMARY_CONFIG.recommendation_max_characters,
+            },
         },
         "required": [
             "best_image_source",
@@ -475,6 +501,284 @@ def analysis_schema() -> dict:
             "recommendation",
         ],
     }
+
+
+def roof_candidate_schema(config: RoofReferenceConfig) -> dict:
+    candidate_keys = list(config.roof_types) + ["coating", "unknown"]
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "building_classification": {"type": "string", "enum": ["single", "mixed", "indeterminate"]},
+            "roof_zones": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 6,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "zone_id": {"type": "string"},
+                        "location": {"type": "string"},
+                        "estimated_area_percentage": {"type": "integer", "minimum": 0, "maximum": 100},
+                        "candidates": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "roof_type": {"type": "string", "enum": candidate_keys},
+                                    "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                                    "evidence": {"type": "string"},
+                                },
+                                "required": ["roof_type", "confidence", "evidence"],
+                            },
+                        },
+                        "limitations": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 0,
+                            "maxItems": 3,
+                        },
+                    },
+                    "required": [
+                        "zone_id",
+                        "location",
+                        "estimated_area_percentage",
+                        "candidates",
+                        "limitations",
+                    ],
+                },
+            },
+            "overall_limitations": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 0,
+                "maxItems": 4,
+            },
+        },
+        "required": ["building_classification", "roof_zones", "overall_limitations"],
+    }
+
+
+def reference_analysis_schema() -> dict:
+    schema = copy.deepcopy(analysis_schema())
+    canonical_roof_types = [
+        "tpo",
+        "pvc",
+        "epdm",
+        "ballasted",
+        "metal",
+        "mod_bit",
+        "tar_and_gravel",
+        "coating",
+        "pvc_or_coating",
+        "epdm_or_mod_bit",
+        "mod_bit_or_coating",
+        "mod_bit_or_tar_and_gravel",
+        "unknown",
+    ]
+    schema["properties"]["building_classification"] = {
+        "type": "string",
+        "enum": ["single", "mixed", "indeterminate"],
+    }
+    schema["properties"]["roof_zones"] = {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "zone_id": {"type": "string"},
+                "location": {"type": "string"},
+                "roof_type": {"type": "string", "enum": canonical_roof_types},
+                "estimated_area_percentage": {"type": "integer", "minimum": 0, "maximum": 100},
+                "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                "supporting_cues": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 5,
+                },
+                "alternatives": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": canonical_roof_types},
+                    "minItems": 0,
+                    "maxItems": 3,
+                },
+                "limitations": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 0,
+                    "maxItems": 3,
+                },
+            },
+            "required": [
+                "zone_id",
+                "location",
+                "roof_type",
+                "estimated_area_percentage",
+                "confidence",
+                "supporting_cues",
+                "alternatives",
+                "limitations",
+            ],
+        },
+    }
+    schema["required"].extend(["building_classification", "roof_zones"])
+    return schema
+
+
+def roof_candidate_prompt(row: dict, config: RoofReferenceConfig) -> str:
+    guide = config.classification_guide_path.read_text(encoding="utf-8")
+    metadata = {
+        "address": row.get("Address"),
+        "property_use": row.get("Property Use"),
+        "building_footprint_sqft": row.get("Building Footprint Sq Ft"),
+        "aerial_source": aerial_source_label(row),
+        "aerial_photo_date": aerial_photo_date_value(row),
+    }
+    return (
+        "Stage 1 roof-type candidate classification. Analyze only the target building aerial image and supplied "
+        "metadata. Divide materially different roof areas into zones before choosing candidates. Return one to three "
+        "evidence-supported candidate keys per zone, ordered most likely first. Use confidence conservatively; do not "
+        "force exact membrane chemistry from color alone. When a smooth white membrane-like surface cannot be separated "
+        "among TPO, PVC, and coating, rank tpo first with reduced confidence; rank pvc or coating first only when their "
+        "specific evidence is clear. Do not apply the TPO default to weathered asphaltic or aggregate-textured roofs. Use the "
+        "canonical key metal without assigning a metal subtype. Use estimated_area_percentage=0 when the visible share cannot "
+        "be estimated responsibly. Evaluate target-image sharpness and resolution before assigning confidence. If the image "
+        "does not resolve the seams, ribs, edges, texture, or application pattern needed to distinguish the leading type, "
+        "cap that zone confidence and overall ai_confidence at 60 and state the limitation. Reference images are intentionally "
+        "withheld at this stage. Return JSON only.\n\n"
+        f"Property metadata:\n{json.dumps(metadata)}\n\n"
+        f"Central classification guide:\n{guide}"
+    )
+
+
+def reference_analysis_prompt(
+    row: dict,
+    stage1: dict,
+    bundle: list[LoadedRoofReference],
+    config: RoofReferenceConfig,
+) -> str:
+    selected = [item.key for item in bundle]
+    central_guide = config.classification_guide_path.read_text(encoding="utf-8")
+    return (
+        analysis_prompt(row)
+        + " This is Stage 2 of the roof-reference workflow. Reassess the target building image using the candidate "
+        "analysis, selected identification guides, and labeled positive reference images supplied after this text. "
+        "Reference examples are comparisons, not templates: do not classify from color, building shape, or superficial "
+        "image similarity alone. Keep visibly distinct roof zones separate, including a small attached section whose "
+        "texture or seam pattern differs from the dominant roof. Use estimated_area_percentage=0 if an area share cannot "
+        "be estimated responsibly. Every roof_zones[].roof_type and alternatives entry must be one canonical key from "
+        "the schema. Use tpo as the default only for an unresolved smooth white membrane-like TPO/PVC/coating comparison, "
+        "with reduced confidence and "
+        "the other plausible keys in alternatives. Use metal as the type without a standing-seam, ribbed, or corrugated "
+        "subtype. A dark, flat, matte attached roof without resolved raised-rib shadows or metal edge construction should "
+        "favor EPDM over metal. Dense regular full-field panel lines plus rigid geometry may support generic metal in soft "
+        "imagery, but confidence must remain 60 or below when rib height and profile are unresolved. For a dark membrane zone "
+        "that cannot be separated between EPDM and modified bitumen, use the controlled "
+        "type epdm_or_mod_bit rather than guessing. For a weathered asphaltic-looking zone that cannot be separated between "
+        "modified bitumen and coating, use mod_bit_or_coating. Never return standalone pvc or coating as the final type; "
+        "use pvc_or_coating, displayed as 'PVC or Coated Roof', whenever PVC/coating is favored over TPO but those two "
+        "cannot be separated from the aerial image. Favor pvc_or_coating over TPO when a monolithic weathered finish "
+        "shows irregular application variation, underlying repairs or substrate details, and wear-through without a "
+        "consistent membrane-sheet grid. A tan matte weathered asphaltic field may be modified bitumen even when roll laps "
+        "fall below image resolution, especially beside a distinct smooth white TPO zone. For an asphaltic or aggregate-looking zone where roll "
+        "laps and stone embedment cannot be resolved, use "
+        "mod_bit_or_tar_and_gravel rather than guessing. If the building is mixed, set the legacy roof_type to "
+        "'Mixed roof types'; the application will derive "
+        "the legacy roof_system summary from canonical zones. If the target image cannot resolve the distinguishing material "
+        "cues, cap the affected zone confidence and overall ai_confidence at 60. Return JSON only. "
+        f"Stage 1 candidate analysis: {json.dumps(stage1)}. Selected reference types: {json.dumps(selected)}. "
+        f"Central classification guide:\n{central_guide}"
+    )
+
+
+def build_openai_candidate_content(row: dict, target_path: Path, config: RoofReferenceConfig) -> list[dict]:
+    return [
+        {"type": "input_text", "text": roof_candidate_prompt(row, config)},
+        {"type": "input_text", "text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
+        {"type": "input_image", "image_url": encode_image_data_url(target_path), "detail": "high"},
+    ]
+
+
+def build_openai_reference_content(
+    row: dict,
+    target_path: Path,
+    stage1: dict,
+    bundle: list[LoadedRoofReference],
+    config: RoofReferenceConfig,
+) -> list[dict]:
+    content: list[dict] = [
+        {"type": "input_text", "text": reference_analysis_prompt(row, stage1, bundle, config)},
+        {"type": "input_text", "text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
+        {"type": "input_image", "image_url": encode_image_data_url(target_path), "detail": "high"},
+    ]
+    for item in bundle:
+        content.append(
+            {
+                "type": "input_text",
+                "text": f"IDENTIFICATION GUIDE — {item.label} ({relative_project_path(item.guide_path)}):\n{item.guide_text}",
+            }
+        )
+        for image_path in item.image_paths:
+            content.append(
+                {
+                    "type": "input_text",
+                    "text": f"POSITIVE {item.label} REFERENCE IMAGE — {relative_project_path(image_path)}:",
+                }
+            )
+            content.append(
+                {"type": "input_image", "image_url": encode_image_data_url(image_path), "detail": "high"}
+            )
+    return content
+
+
+def gemini_inline_image(path: Path) -> dict:
+    return {
+        "inlineData": {
+            "mimeType": image_mime_type(path),
+            "data": encode_image_base64(path),
+        }
+    }
+
+
+def build_gemini_candidate_parts(row: dict, target_path: Path, config: RoofReferenceConfig) -> list[dict]:
+    schema_instruction = "\nRequired JSON schema:\n" + json.dumps(roof_candidate_schema(config))
+    return [
+        {"text": roof_candidate_prompt(row, config) + schema_instruction},
+        {"text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
+        gemini_inline_image(target_path),
+    ]
+
+
+def build_gemini_reference_parts(
+    row: dict,
+    target_path: Path,
+    stage1: dict,
+    bundle: list[LoadedRoofReference],
+    config: RoofReferenceConfig,
+) -> list[dict]:
+    schema_instruction = "\nRequired JSON schema:\n" + json.dumps(reference_analysis_schema())
+    parts: list[dict] = [
+        {"text": reference_analysis_prompt(row, stage1, bundle, config) + schema_instruction},
+        {"text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
+        gemini_inline_image(target_path),
+    ]
+    for item in bundle:
+        parts.append(
+            {
+                "text": f"IDENTIFICATION GUIDE — {item.label} ({relative_project_path(item.guide_path)}):\n{item.guide_text}"
+            }
+        )
+        for image_path in item.image_paths:
+            parts.append({"text": f"POSITIVE {item.label} REFERENCE IMAGE — {relative_project_path(image_path)}:"})
+            parts.append(gemini_inline_image(image_path))
+    return parts
 
 
 def extract_response_text(response: dict) -> str:
@@ -525,6 +829,185 @@ def openai_usage_summary(response: dict) -> dict:
             "OPENAI_OUTPUT_COST_PER_1M": output_rate,
         }
     return summary
+
+
+def combined_ai_usage(stage1: dict, stage2: dict) -> dict:
+    combined: dict[str, object] = {}
+    for key in (
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
+    ):
+        combined[key] = int(stage1.get(key) or 0) + int(stage2.get(key) or 0)
+    if "estimated_cost_usd" in stage1 or "estimated_cost_usd" in stage2:
+        combined["estimated_cost_usd"] = round(
+            float(stage1.get("estimated_cost_usd") or 0) + float(stage2.get("estimated_cost_usd") or 0),
+            6,
+        )
+    combined["by_stage"] = {"candidate_classification": stage1, "reference_comparison": stage2}
+    return combined
+
+
+def call_openai_structured(
+    content: list[dict],
+    model: str,
+    schema: dict,
+    schema_name: str,
+    max_output_tokens: int,
+) -> tuple[dict, dict]:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    payload = {
+        "model": model,
+        "input": [{"role": "user", "content": content}],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": schema_name,
+                "schema": schema,
+                "strict": True,
+            }
+        },
+        "max_output_tokens": max_output_tokens,
+        "store": False,
+    }
+    request = Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "PilotPointIQ Roof Report Generator",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=180) as response:
+            data = json.load(response)
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"OpenAI API error {exc.code}: {body}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"OpenAI API request failed: {exc}") from exc
+    text = extract_response_text(data)
+    if not text:
+        raise RuntimeError("OpenAI API returned no analysis text")
+    return json.loads(text), data
+
+
+def reference_images_per_type() -> int:
+    try:
+        value = int(os.environ.get("ROOF_REFERENCE_IMAGES_PER_TYPE", "2"))
+    except ValueError:
+        value = 2
+    return max(1, min(value, 4))
+
+
+def validate_candidate_analysis(stage1: dict) -> None:
+    if not isinstance(stage1, dict):
+        raise RuntimeError("Roof-reference Stage 1 did not return a JSON object")
+    if stage1.get("building_classification") not in {"single", "mixed", "indeterminate"}:
+        raise RuntimeError("Roof-reference Stage 1 returned an invalid building_classification")
+    zones = stage1.get("roof_zones")
+    if not isinstance(zones, list) or not zones:
+        raise RuntimeError("Roof-reference Stage 1 returned no roof_zones")
+    for index, zone in enumerate(zones):
+        if not isinstance(zone, dict) or not isinstance(zone.get("candidates"), list) or not zone["candidates"]:
+            raise RuntimeError(f"Roof-reference Stage 1 zone {index + 1} returned no candidates")
+
+
+def validate_reference_analysis(analysis: dict) -> None:
+    if not isinstance(analysis, dict):
+        raise RuntimeError("Roof-reference Stage 2 did not return a JSON object")
+    required = set(reference_analysis_schema()["required"])
+    missing = sorted(key for key in required if key not in analysis)
+    if missing:
+        raise RuntimeError("Roof-reference Stage 2 omitted required fields: " + ", ".join(missing))
+    if analysis.get("building_classification") not in {"single", "mixed", "indeterminate"}:
+        raise RuntimeError("Roof-reference Stage 2 returned an invalid building_classification")
+    zones = analysis.get("roof_zones")
+    if not isinstance(zones, list) or not zones:
+        raise RuntimeError("Roof-reference Stage 2 returned no roof_zones")
+
+
+def normalize_reference_analysis(analysis: dict) -> None:
+    """Derive legacy report labels from canonical Stage 2 roof-zone types."""
+    labels = {
+        "tpo": "TPO",
+        "pvc": "PVC",
+        "epdm": "EPDM",
+        "ballasted": "Ballasted",
+        "metal": "Metal",
+        "mod_bit": "Modified bitumen",
+        "tar_and_gravel": "Tar and gravel / BUR",
+        "coating": "Coated roof",
+        "pvc_or_coating": "PVC or Coated Roof",
+        "epdm_or_mod_bit": "EPDM or Modified Bitumen",
+        "mod_bit_or_coating": "Modified Bitumen or Coated Roof",
+        "mod_bit_or_tar_and_gravel": "Modified Bitumen or Tar and Gravel",
+        "unknown": "Unknown",
+    }
+    zone_types: list[str] = []
+    for zone in analysis.get("roof_zones") or []:
+        key = zone.get("roof_type")
+        if key in {"pvc", "coating"}:
+            key = "pvc_or_coating"
+            zone["roof_type"] = key
+        if key in labels and key not in zone_types:
+            zone_types.append(key)
+
+    resolved = [key for key in zone_types if key != "unknown"]
+    has_unknown = "unknown" in zone_types
+    if len(resolved) > 1 or (resolved and has_unknown):
+        analysis["building_classification"] = "mixed"
+        analysis["roof_type"] = "Mixed roof types"
+        analysis["roof_system"] = "Mixed roof types: " + ", ".join(labels[key] for key in zone_types)
+    elif resolved:
+        analysis["building_classification"] = "single"
+        analysis["roof_type"] = labels[resolved[0]]
+        analysis["roof_system"] = labels[resolved[0]]
+    else:
+        analysis["building_classification"] = "indeterminate"
+        analysis["roof_type"] = "Unknown"
+        analysis["roof_system"] = "Unknown"
+
+
+def call_openai_reference_analysis(row: dict, target_path: Path, model: str) -> dict:
+    config = load_roof_reference_config()
+    stage1, stage1_response = call_openai_structured(
+        build_openai_candidate_content(row, target_path, config),
+        model,
+        roof_candidate_schema(config),
+        "roof_candidate_classification",
+        1400,
+    )
+    validate_candidate_analysis(stage1)
+    selected = select_reference_types(stage1, config)
+    bundle = load_reference_bundle(selected, config, reference_images_per_type())
+    analysis, stage2_response = call_openai_structured(
+        build_openai_reference_content(row, target_path, stage1, bundle, config),
+        model,
+        reference_analysis_schema(),
+        "roof_reference_analysis",
+        2800,
+    )
+    validate_reference_analysis(analysis)
+    normalize_reference_analysis(analysis)
+    stage1_usage = openai_usage_summary(stage1_response)
+    stage2_usage = openai_usage_summary(stage2_response)
+    analysis["source"] = "openai"
+    analysis["usage"] = combined_ai_usage(stage1_usage, stage2_usage)
+    analysis["reference_workflow"] = roof_reference_trace(
+        config,
+        bundle,
+        stage1,
+        "openai",
+        model,
+    )
+    return analysis
 
 
 def call_openai_analysis(row: dict, denver_path: Path | None, drcog_path: Path | None, model: str) -> dict:
@@ -669,6 +1152,84 @@ def call_gemini_analysis(row: dict, denver_path: Path | None, drcog_path: Path |
     return analysis
 
 
+def call_gemini_structured(parts: list[dict], model: str, max_output_tokens: int) -> tuple[dict, dict]:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+    payload = {
+        "contents": [{"role": "user", "parts": parts}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": max_output_tokens,
+            "responseMimeType": "application/json",
+        },
+    }
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "PilotPointIQ Roof Report Generator",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=180) as response:
+            data = json.load(response)
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Gemini API error {exc.code}: {body}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"Gemini API request failed: {exc}") from exc
+    text = extract_gemini_text(data)
+    if not text:
+        raise RuntimeError(f"Gemini API returned no analysis text: {data}")
+    return parse_json_text(text), data
+
+
+def gemini_usage_summary(response: dict) -> dict:
+    usage = response.get("usageMetadata") or {}
+    return {
+        "input_tokens": int(usage.get("promptTokenCount") or 0),
+        "cached_input_tokens": int(usage.get("cachedContentTokenCount") or 0),
+        "output_tokens": int(usage.get("candidatesTokenCount") or 0),
+        "reasoning_output_tokens": int(usage.get("thoughtsTokenCount") or 0),
+        "total_tokens": int(usage.get("totalTokenCount") or 0),
+    }
+
+
+def call_gemini_reference_analysis(row: dict, target_path: Path, model: str) -> dict:
+    config = load_roof_reference_config()
+    stage1, stage1_response = call_gemini_structured(
+        build_gemini_candidate_parts(row, target_path, config),
+        model,
+        1400,
+    )
+    validate_candidate_analysis(stage1)
+    selected = select_reference_types(stage1, config)
+    bundle = load_reference_bundle(selected, config, reference_images_per_type())
+    analysis, stage2_response = call_gemini_structured(
+        build_gemini_reference_parts(row, target_path, stage1, bundle, config),
+        model,
+        2800,
+    )
+    validate_reference_analysis(analysis)
+    normalize_reference_analysis(analysis)
+    stage1_usage = gemini_usage_summary(stage1_response)
+    stage2_usage = gemini_usage_summary(stage2_response)
+    analysis["source"] = "gemini"
+    analysis["usage"] = combined_ai_usage(stage1_usage, stage2_usage)
+    analysis["reference_workflow"] = roof_reference_trace(
+        config,
+        bundle,
+        stage1,
+        "gemini",
+        model,
+    )
+    return analysis
+
+
 def load_or_create_analysis(
     row: dict,
     denver_path: Path | None,
@@ -678,6 +1239,7 @@ def load_or_create_analysis(
     provider: str,
     model: str,
     allow_ai_fallback: bool,
+    use_roof_references: bool = False,
 ) -> dict:
     cache_dir.mkdir(parents=True, exist_ok=True)
     parcel = normalize_text(row.get("Parcel Number")) or hashlib.sha1(json.dumps(row).encode("utf-8")).hexdigest()[:12]
@@ -687,7 +1249,31 @@ def load_or_create_analysis(
     cache_fallback = False
     if use_ai:
         try:
-            if provider == "gemini":
+            if use_roof_references:
+                if not denver_path:
+                    raise RuntimeError("Roof-reference classification requires a target aerial image")
+                try:
+                    if provider == "gemini":
+                        analysis = call_gemini_reference_analysis(row, denver_path, model)
+                    else:
+                        analysis = call_openai_reference_analysis(row, denver_path, model)
+                except Exception as reference_exc:
+                    print(
+                        f"Warning: {provider} roof-reference workflow failed for {parcel}; "
+                        f"retrying legacy one-call analysis: {reference_exc}"
+                    )
+                    if provider == "gemini":
+                        analysis = call_gemini_analysis(row, denver_path, drcog_path, model)
+                    else:
+                        analysis = call_openai_analysis(row, denver_path, drcog_path, model)
+                    analysis["reference_workflow"] = {
+                        "enabled": True,
+                        "status": "legacy_fallback",
+                        "provider": provider,
+                        "model": model,
+                        "error": str(reference_exc),
+                    }
+            elif provider == "gemini":
                 analysis = call_gemini_analysis(row, denver_path, drcog_path, model)
             else:
                 analysis = call_openai_analysis(row, denver_path, drcog_path, model)
@@ -949,27 +1535,10 @@ def visual_risk_factors_from_text(analysis: dict) -> dict:
         + [normalize_text(item) for item in analysis.get("observations") or []]
     ).lower()
 
-    if not isinstance(factors.get("dark_staining_or_discoloration"), bool) and any(
-        term in text for term in ("dark stain", "darkened", "discolor", "uneven color", "staining", "mottled")
-    ):
-        factors["dark_staining_or_discoloration"] = True
-    if not isinstance(factors.get("suspected_ponding"), bool) and any(
-        term in text for term in ("ponding", "standing water", "poor drainage", "water retention")
-    ):
-        factors["suspected_ponding"] = True
-    if not isinstance(factors.get("high_penetration_density"), bool) and any(
-        term in text for term in ("many penetration", "numerous penetration", "skylight", "vent", "rooftop unit", "rtu", "curb")
-    ):
-        factors["high_penetration_density"] = True
-    if not isinstance(factors.get("overhanging_trees_or_debris"), bool) and any(
-        term in text for term in ("overhanging tree", "tree overhang", "debris", "leaf", "branches")
-    ):
-        factors["overhanging_trees_or_debris"] = True
-
-    factors.setdefault("dark_staining_or_discoloration", False)
-    factors.setdefault("suspected_ponding", False)
-    factors.setdefault("high_penetration_density", False)
-    factors.setdefault("overhanging_trees_or_debris", False)
+    for key, factor_config in REPORT_SUMMARY_CONFIG.visual_risk_factors.items():
+        if not isinstance(factors.get(key), bool) and any(term.lower() in text for term in factor_config.indicators):
+            factors[key] = True
+        factors.setdefault(key, False)
     factors["notes"] = [normalize_text(note) for note in notes if normalize_text(note)][:4]
     return factors
 
@@ -984,27 +1553,36 @@ def apply_visual_risk_adjustment(analysis: dict) -> dict:
     active_labels: list[str] = []
     score_cap = 100
     if factors.get("dark_staining_or_discoloration"):
-        active_labels.append("dark staining or inconsistent roof color")
+        active_labels.append(REPORT_SUMMARY_CONFIG.visual_risk_factors["dark_staining_or_discoloration"].label)
         score_cap = min(score_cap, 72)
         breakdown["Membrane Condition"] = min(clamp_score(breakdown.get("Membrane Condition"), 72), 68)
         breakdown["Overall Maintenance"] = min(clamp_score(breakdown.get("Overall Maintenance"), 72), 68)
     if factors.get("suspected_ponding"):
-        active_labels.append("possible ponding or drainage stress")
+        active_labels.append(REPORT_SUMMARY_CONFIG.visual_risk_factors["suspected_ponding"].label)
         score_cap = min(score_cap, 68)
         breakdown["Ponding"] = min(clamp_score(breakdown.get("Ponding"), 65), 55)
         breakdown["Membrane Condition"] = min(clamp_score(breakdown.get("Membrane Condition"), 65), 65)
     if factors.get("dark_staining_or_discoloration") and factors.get("suspected_ponding"):
         score_cap = min(score_cap, 62)
     if factors.get("high_penetration_density"):
-        active_labels.append("high penetration or rooftop-unit density")
+        active_labels.append(REPORT_SUMMARY_CONFIG.visual_risk_factors["high_penetration_density"].label)
         score_cap = min(score_cap, 74)
         breakdown["Penetrations"] = min(clamp_score(breakdown.get("Penetrations"), 62), 58)
         breakdown["Flashing & Seals"] = min(clamp_score(breakdown.get("Flashing & Seals"), 66), 64)
     if factors.get("overhanging_trees_or_debris"):
-        active_labels.append("tree overhang or roof debris exposure")
+        active_labels.append(REPORT_SUMMARY_CONFIG.visual_risk_factors["overhanging_trees_or_debris"].label)
         score_cap = min(score_cap, 76)
         breakdown["Overall Maintenance"] = min(clamp_score(breakdown.get("Overall Maintenance"), 66), 62)
         breakdown["Membrane Condition"] = min(clamp_score(breakdown.get("Membrane Condition"), 70), 68)
+
+    recommendation = normalize_text(adjusted.get("recommendation"))
+    if "qualified commercial roof-coating contractor" not in recommendation.lower():
+        recommendation = append_with_limit(
+            recommendation,
+            REPORT_SUMMARY_CONFIG.contractor_addendum,
+            REPORT_SUMMARY_CONFIG.recommendation_max_characters,
+        )
+    adjusted["recommendation"] = recommendation
 
     if not active_labels:
         return adjusted
@@ -1016,7 +1594,7 @@ def apply_visual_risk_adjustment(analysis: dict) -> dict:
     adjusted["condition_label"] = condition_label_for_score(adjusted_score)
     adjusted["risk_level"] = risk_level_for_score(adjusted_score)
 
-    concern_text = "Visible risk factors include " + ", ".join(active_labels) + "."
+    concern_text = REPORT_SUMMARY_CONFIG.concern_template.format(labels=", ".join(active_labels))
     observations = [normalize_text(item) for item in adjusted.get("observations") or [] if normalize_text(item)]
     if not any(label in " ".join(observations).lower() for label in active_labels):
         observations.insert(0, concern_text)
@@ -1024,12 +1602,10 @@ def apply_visual_risk_adjustment(analysis: dict) -> dict:
 
     summary = normalize_text(adjusted.get("summary"))
     if concern_text.lower() not in summary.lower():
-        adjusted["summary"] = normalize_text(f"{summary} {concern_text}")
-
-    recommendation = normalize_text(adjusted.get("recommendation"))
-    if "field inspection" not in recommendation.lower():
-        adjusted["recommendation"] = normalize_text(
-            f"{recommendation} Field inspection should verify drainage, moisture, penetrations, flashing, and debris-related damage."
+        adjusted["summary"] = append_with_limit(
+            summary,
+            concern_text,
+            REPORT_SUMMARY_CONFIG.summary_max_characters,
         )
     return adjusted
 
@@ -1040,10 +1616,11 @@ def align_summary_with_adjusted_condition(summary: str, label: str, risk: str) -
         return text
     label_text = label.lower()
     risk_text = risk.lower()
-    for condition in ("good", "fair", "poor"):
-        text = text.replace(f"in {condition} condition", f"in {label_text} current-likely condition")
-        text = text.replace(f"in generally {condition} condition", f"in {label_text} current-likely condition")
-    for risk_level in ("low", "moderate", "medium", "high"):
+    replacement = REPORT_SUMMARY_CONFIG.adjusted_condition_template.format(condition=label_text)
+    for condition in REPORT_SUMMARY_CONFIG.condition_terms:
+        text = text.replace(f"in {condition} condition", replacement)
+        text = text.replace(f"in generally {condition} condition", replacement)
+    for risk_level in REPORT_SUMMARY_CONFIG.risk_terms:
         text = text.replace(f"Overall risk is {risk_level}", f"Overall risk is {risk_text}")
         text = text.replace(f"overall risk is {risk_level}", f"overall risk is {risk_text}")
     return text
@@ -1087,45 +1664,6 @@ def apply_aerial_age_adjustment(row: dict, analysis: dict) -> dict:
             continue
 
     return adjusted
-
-
-def coating_recommendation(analysis: dict) -> str:
-    score = int(analysis.get("overall_score") or 0)
-    risk = normalize_text(analysis.get("risk_level")).upper()
-    breakdown = analysis.get("breakdown") or {}
-    membrane = int(breakdown.get("Membrane Condition") or score)
-    ponding = int(breakdown.get("Ponding") or score)
-    flashing = int(breakdown.get("Flashing & Seals") or score)
-    observations = " ".join(normalize_text(item) for item in analysis.get("observations") or []).lower()
-    concern_terms = (
-        "ponding",
-        "open tear",
-        "missing",
-        "collapse",
-        "widespread",
-        "severe",
-        "active leak",
-        "trapped moisture",
-        "saturated",
-    )
-    visible_concerns = any(term in observations for term in concern_terms)
-
-    if risk == "HIGH" or score < 60 or membrane < 60 or ponding < 55 or flashing < 55:
-        return (
-            "Roof coating is not recommended from the aerial analysis alone. The observed condition indicates "
-            "that field inspection should first confirm membrane integrity, moisture conditions, seams, flashing, "
-            "and whether repair or replacement is more appropriate."
-        )
-    if score >= 72 and membrane >= 70 and ponding >= 65 and flashing >= 65 and not visible_concerns:
-        return (
-            "A silicone roof coating appears to be a reasonable restoration option based on the observed conditions, "
-            "provided a field inspection confirms the roof is dry, structurally sound, well-adhered, and free of "
-            "active leaks or trapped moisture."
-        )
-    return (
-        "A silicone roof coating may be viable, but it should be treated as conditional until field inspection "
-        "verifies membrane adhesion, moisture content, seams, penetrations, flashing, and drainage performance."
-    )
 
 
 def risk_meter_value(score: int, risk_level: str) -> int:
@@ -1256,101 +1794,116 @@ def replacement_confidence_inputs(row: dict, analysis: dict, denver_path: Path |
     )
 
 
-def draw_replacement_cost_estimate(
+def draw_roof_repair_options(
     draw: ImageDraw.ImageDraw,
     row: dict,
     analysis: dict,
     denver_path: Path | None,
     box: tuple[int, int, int, int],
 ) -> None:
-    card(draw, box, "Roof Replacement Cost Estimate")
-    x1, y1, x2, _ = box
+    card(draw, box, "Roof Repair Options")
+    x1, y1, x2, y2 = box
     estimate = estimate_roof_replacement_cost(
         roof_condition_score=float(analysis.get("overall_score") or 0),
         roof_area_sqft=float(int_value(row.get("Building Footprint Sq Ft"))),
         confidence_inputs=replacement_confidence_inputs(row, analysis, denver_path),
     )
+    area_sqft = max(0, float(int_value(row.get("Building Footprint Sq Ft"))))
+    coating_estimate = estimate_roof_coating_cost(area_sqft)
 
-    draw.text((x1 + 22, y1 + 62), "TOTAL PROJECT COST", fill=MUTED, font=FONT["small_bold"])
-    draw.text((x1 + 22, y1 + 92), format_currency(estimate.total_project_cost), fill="#177a28", font=FONT["total_cost"])
-    draw.text((x1 + 22, y1 + 150), f"${estimate.cost_per_sqft:,.2f} / SF", fill=TEXT, font=FONT["body_bold"])
+    disclaimer = cost_estimation_disclaimer()
+    content_top = y1 + 48
+    content_bottom = y2 - 4
+    disclaimer_height = 88
+    sections_bottom = content_bottom - disclaimer_height
+    section_height = (sections_bottom - content_top) // 3
+    section_tops = [content_top + section_height * index for index in range(3)]
+    section_tops.append(sections_bottom)
+    detail_x = x1 + 420
+    value_x = x2 - 178
 
-    label_x = x1 + 420
-    value_x = x2 - 190
-    y = y1 + 58
-    draw.text((label_x, y), "COST COMPONENT", fill=MUTED, font=FONT["small_bold"])
-    draw.text((value_x, y), "COST", fill=MUTED, font=FONT["small_bold"])
-    y += 28
+    def draw_section_title(top: int, title: str, add_separator: bool) -> None:
+        if add_separator:
+            draw.line((x1 + 16, top, x2 - 16, top), fill=BORDER, width=2)
+        draw.text((x1 + 22, top + 8), title, fill=DARK_BLUE, font=FONT["body_bold"])
 
-    for label, value in estimate.component_costs.items():
-        draw.text((label_x, y), label, fill=TEXT, font=FONT["body"])
-        draw.text((value_x, y), format_currency(value), fill=TEXT, font=FONT["body_bold"])
-        y += 28
+    def draw_cost_section(
+        top: int,
+        title: str,
+        total: float,
+        rate: float,
+        rows: list[tuple[str, float]],
+        add_separator: bool,
+    ) -> None:
+        draw_section_title(top, title, add_separator)
+        draw.text((x1 + 22, top + 42), "TOTAL PROJECT COST", fill=MUTED, font=FONT["small_bold"])
+        draw.text((x1 + 22, top + 65), format_currency(total), fill="#177a28", font=FONT["total_cost"])
+        draw.text((x1 + 22, top + 106), f"${rate:,.2f} / SF", fill=TEXT, font=FONT["body_bold"])
 
-    draw.line((label_x, y + 4, x2 - 24, y + 4), fill=LIGHT, width=2)
-    y += 18
-    summary_rows = [
-        ("Replacement Subtotal", estimate.replacement_subtotal),
-        ("Contingency (15%)", estimate.contingency_cost),
-        ("Total Project Cost", estimate.total_project_cost),
-    ]
-    for label, value in summary_rows:
-        value_font = FONT["body_bold"]
-        value_fill = "#177a28" if label == "Total Project Cost" else TEXT
-        draw.text((label_x, y), label, fill=TEXT, font=FONT["body_bold"])
-        draw.text((value_x, y), format_currency(value), fill=value_fill, font=value_font)
-        y += 26
+        draw.text((detail_x, top + 42), "COST SUMMARY", fill=MUTED, font=FONT["small_bold"])
+        row_y = top + 65
+        for label, value in rows:
+            value_fill = "#177a28" if label == "Total Project Cost" else TEXT
+            draw.text((detail_x, row_y), label, fill=TEXT, font=FONT["small"])
+            draw.text((value_x, row_y), format_currency(value), fill=value_fill, font=FONT["small_bold"])
+            row_y += 25
 
-    disclaimer = (
-        "This replacement cost is an estimate derived from aerial imagery, public property "
-        "records, and commercial roofing cost models. It is intended for budgeting purposes only and "
-        "should not be considered a contractor quote or engineering assessment."
+    draw_cost_section(
+        section_tops[0],
+        "Roof Replacement Cost Estimate",
+        estimate.total_project_cost,
+        estimate.cost_per_sqft,
+        [
+            ("Replacement Subtotal", estimate.replacement_subtotal),
+            (f"Contingency ({estimate.contingency_percentage:.0%})", estimate.contingency_cost),
+            ("Total Project Cost", estimate.total_project_cost),
+        ],
+        False,
     )
-    draw_text(draw, (x1 + 22, y + 22), disclaimer, MUTED, FONT["small"], max_width=x2 - x1 - 44, line_gap=1)
-
-
-def draw_overlay_cost_estimate(
-    draw: ImageDraw.ImageDraw,
-    row: dict,
-    analysis: dict,
-    denver_path: Path | None,
-    box: tuple[int, int, int, int],
-) -> None:
-    card(draw, box, "Roof Overlay Cost Estimate")
-    x1, y1, x2, _ = box
-    estimate = estimate_roof_replacement_cost(
-        roof_condition_score=float(analysis.get("overall_score") or 0),
-        roof_area_sqft=float(int_value(row.get("Building Footprint Sq Ft"))),
-        confidence_inputs=replacement_confidence_inputs(row, analysis, denver_path),
+    draw_cost_section(
+        section_tops[1],
+        "Roof Overlay Cost Estimate",
+        estimate.overlay_total_project_cost,
+        estimate.overlay_cost_per_sqft,
+        [
+            ("Overlay Subtotal", estimate.overlay_subtotal),
+            (f"Contingency ({estimate.overlay_contingency_percentage:.0%})", estimate.overlay_contingency_cost),
+            ("Total Project Cost", estimate.overlay_total_project_cost),
+        ],
+        True,
     )
 
-    draw.text((x1 + 22, y1 + 58), "TOTAL PROJECT COST", fill=MUTED, font=FONT["small_bold"])
-    draw.text((x1 + 22, y1 + 86), format_currency(estimate.overlay_total_project_cost), fill="#177a28", font=FONT["total_cost"])
-    draw.text((x1 + 22, y1 + 128), f"${estimate.overlay_cost_per_sqft:,.2f} / SF", fill=TEXT, font=FONT["body_bold"])
-
-    label_x = x1 + 420
-    value_x = x2 - 190
-    y = y1 + 58
-    draw.text((label_x, y), "COST COMPONENT", fill=MUTED, font=FONT["small_bold"])
-    draw.text((value_x, y), "COST", fill=MUTED, font=FONT["small_bold"])
-    y += 28
-    summary_rows = [
-        ("Overlay Subtotal", estimate.overlay_subtotal),
-        ("Contingency (10%)", estimate.overlay_contingency_cost),
-        ("Total Project Cost", estimate.overlay_total_project_cost),
-    ]
-    for label, value in summary_rows:
-        value_fill = "#177a28" if label == "Total Project Cost" else TEXT
-        draw.text((label_x, y), label, fill=TEXT, font=FONT["body_bold"])
-        draw.text((value_x, y), format_currency(value), fill=value_fill, font=FONT["body_bold"])
-        y += 26
-
-    disclaimer = (
-        "This overlay cost is an estimate derived from aerial imagery, public property "
-        "records, and commercial roofing cost models. It is intended for budgeting purposes only and "
-        "should not be considered a contractor quote or engineering assessment."
+    coating_top = section_tops[2]
+    draw_section_title(coating_top, "Roof Coating Estimate", True)
+    coating_total_low = min(option.minimum_total_cost for option in coating_estimate.warranty_options)
+    coating_total_high = max(option.maximum_total_cost for option in coating_estimate.warranty_options)
+    draw.text((x1 + 22, coating_top + 42), "TOTAL PROJECT COST", fill=MUTED, font=FONT["small_bold"])
+    coating_total_range = f"{format_currency(coating_total_low)} - {format_currency(coating_total_high)}"
+    draw.text((x1 + 22, coating_top + 65), coating_total_range, fill="#177a28", font=FONT["total_cost"])
+    coating_rate_low = coating_estimate.warranty_options[0].minimum_cost_per_sqft
+    coating_rate_high = coating_estimate.warranty_options[-1].maximum_cost_per_sqft
+    coating_rate_range = f"${coating_rate_low:,.2f} - ${coating_rate_high:,.2f} / SF"
+    draw.text((x1 + 22, coating_top + 106), coating_rate_range, fill=TEXT, font=FONT["body_bold"])
+    warranty_x = detail_x
+    range_x = x2 - 220
+    draw.text((warranty_x, coating_top + 42), "WARRANTY TERM", fill=MUTED, font=FONT["small_bold"])
+    draw.text((range_x, coating_top + 42), "BUDGETARY COST RANGE", fill=MUTED, font=FONT["small_bold"])
+    for index, option in enumerate(coating_estimate.warranty_options):
+        row_y = coating_top + 66 + index * 30
+        draw.text((warranty_x, row_y), f"{option.years} Year Warranty", fill=TEXT, font=FONT["body_bold"])
+        cost_range = f"{format_currency(option.minimum_total_cost)} - {format_currency(option.maximum_total_cost)}"
+        draw.text((range_x, row_y), cost_range, fill="#177a28", font=FONT["body_bold"])
+    draw.line((x1 + 16, sections_bottom, x2 - 16, sections_bottom), fill=BORDER, width=2)
+    draw_text(
+        draw,
+        (x1 + 22, sections_bottom + 10),
+        disclaimer,
+        MUTED,
+        FONT["small"],
+        max_width=x2 - x1 - 44,
+        line_gap=1,
+        max_lines=5,
     )
-    draw_text(draw, (x1 + 22, y1 + 162), disclaimer, MUTED, FONT["small"], max_width=x2 - x1 - 44, line_gap=1)
 
 
 def format_land_area(value: object) -> str:
@@ -1383,26 +1936,6 @@ def draw_building_characteristics(draw: ImageDraw.ImageDraw, row: dict, box: tup
         label_font=FONT["small_bold"],
         value_font=FONT["small_bold"],
     )
-
-
-def possible_roof_systems_text(analysis: dict) -> str:
-    systems = analysis.get("possible_roof_systems") or []
-    if not isinstance(systems, list):
-        return ""
-    parts: list[str] = []
-    for item in systems[:3]:
-        if not isinstance(item, dict):
-            continue
-        system = normalize_text(item.get("system"))
-        if not system:
-            continue
-        confidence = item.get("confidence")
-        try:
-            confidence_text = f" ({int(confidence)}%)"
-        except (TypeError, ValueError):
-            confidence_text = ""
-        parts.append(system + confidence_text)
-    return "; ".join(parts)
 
 
 def visible_concerns_text(analysis: dict) -> str:
@@ -1483,8 +2016,7 @@ def render_report(row: dict, analysis: dict, denver_path: Path | None, drcog_pat
         draw,
         [
             ("Roof Type", normalize_text(analysis.get("roof_type"))),
-            ("Roof System", normalize_text(analysis.get("roof_system"))),
-            ("Possible Types", possible_roof_systems_text(analysis)),
+            ("Roof System", roof_system_card_text(analysis)),
             ("Visible Concerns", visible_concerns_text(analysis)),
             ("Roof Age Est.", normalize_text(analysis.get("roof_age_estimate"))),
             ("Roof Area", f"{format_int(row.get('Building Footprint Sq Ft'))} SF"),
@@ -1520,8 +2052,7 @@ def render_report(row: dict, analysis: dict, denver_path: Path | None, drcog_pat
     draw.text((MARGIN + 22, y + 12), "Recommendation:", fill=TEXT, font=FONT["body_bold"])
     draw_text(draw, (MARGIN + 22, y + 44), normalize_text(analysis.get("recommendation")), TEXT, FONT["body"], max_width=lower_left_text_width, line_gap=6)
 
-    draw_replacement_cost_estimate(draw, row, analysis, denver_path, (lower_right_x1, 1400, 1655, 1825))
-    draw_overlay_cost_estimate(draw, row, analysis, denver_path, (lower_right_x1, 1845, 1655, 2075))
+    draw_roof_repair_options(draw, row, analysis, denver_path, (lower_right_x1, 1400, 1655, 2075))
 
     pilotpointiq_logo_path = Path(os.environ.get("PILOTPOINTIQ_LOGO_PATH", DEFAULT_PILOTPOINTIQ_LOGO_PATH))
     paste_logo_trimmed_fit(canvas, pilotpointiq_logo_path, (MARGIN, 2092, 230, 2160))
@@ -1709,10 +2240,10 @@ def write_analysis_json(row: dict, analysis: dict, json_dirs: tuple[Path, ...], 
         (directory / file_name).write_text(content, encoding="utf-8")
 
 
-def existing_analysis_source(row: dict, json_dirs: tuple[Path, ...], provider: str) -> str:
+def existing_analysis_record(row: dict, json_dirs: tuple[Path, ...], provider: str) -> dict:
     parcel = normalize_text(row.get("Parcel Number"))
     if not parcel:
-        return ""
+        return {}
     for directory in json_dirs:
         for prefix in (provider, "openai", "gemini", "fallback"):
             path = directory / f"{prefix}-{parcel}.json"
@@ -1722,8 +2253,15 @@ def existing_analysis_source(row: dict, json_dirs: tuple[Path, ...], provider: s
                 data = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-            return normalize_text(data.get("source")).lower() or prefix
-    return ""
+            if isinstance(data, dict):
+                data.setdefault("source", prefix)
+                return data
+    return {}
+
+
+def existing_analysis_source(row: dict, json_dirs: tuple[Path, ...], provider: str) -> str:
+    data = existing_analysis_record(row, json_dirs, provider)
+    return normalize_text(data.get("source")).lower()
 
 
 def parse_args() -> argparse.Namespace:
@@ -1743,6 +2281,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-ai", action="store_true", help="Call AI vision analysis when the selected provider API key is available")
     parser.add_argument("--ai-provider", choices=("openai", "gemini"), default="openai", help="AI provider for roof image analysis")
     parser.add_argument("--ai-model", default=None, help="Provider model for image analysis; defaults by provider")
+    parser.add_argument(
+        "--roof-reference-classification",
+        action="store_true",
+        help="Replace legacy one-call roof analysis with the feature-flagged two-stage reference workflow",
+    )
     parser.add_argument("--allow-ai-fallback", action="store_true", help="Generate fallback reports if the selected AI provider fails")
     parser.add_argument("--skip-existing-reports", action="store_true", help="Skip rows whose target PDF already exists")
     parser.add_argument("--only-missing", action="store_true", help="Alias for --skip-existing-reports")
@@ -1750,6 +2293,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force", action="store_true", help="Replace existing output files; this is the default behavior")
     parser.add_argument("--cleanup-stale-only", action="store_true", help="Only remove stale parcel-scoped duplicate files; do not regenerate reports")
     parser.add_argument("--manifest", default=None, help="Write a JSON run manifest to this path")
+    parser.add_argument(
+        "--pcs-request",
+        default=None,
+        help="PCS single-address/map-selection JSON; only listed parcels are eligible for reports",
+    )
+    parser.add_argument(
+        "--skip-live-footprint-validation",
+        action="store_true",
+        help="Emergency/offline bypass for live Supabase/county geometry validation",
+    )
     return parser.parse_args()
 
 
@@ -1771,6 +2324,32 @@ def main() -> int:
     if not input_path.is_absolute():
         input_path = base_dir / input_path
     rows = read_rows(input_path)
+    pcs_request = None
+    assessor_results = {}
+    if args.pcs_request:
+        pcs_request_path = Path(args.pcs_request)
+        if not pcs_request_path.is_absolute():
+            pcs_request_path = base_dir / pcs_request_path
+        with pcs_request_path.open(encoding="utf-8") as handle:
+            pcs_request = parse_pcs_request(json.load(handle))
+        rows = filter_selected_rows(rows, pcs_request)
+        matched = {
+            (
+                normalize_text(row.get("County")).lower().replace(" county", "").replace(" ", "_"),
+                normalize_identifier(row.get("Parcel Number")),
+            )
+            for row in rows
+        }
+        missing = [
+            f"{item.county}:{item.parcel_id}"
+            for item in pcs_request.properties
+            if (item.county, normalize_identifier(item.parcel_id)) not in matched
+        ]
+        if missing:
+            raise RuntimeError(
+                "PCS selected parcel(s) were not found in the report input: " + ", ".join(missing)
+            )
+        assessor_results = fetch_request_assessor_details(pcs_request)
     selected_rows = rows[args.start :]
     if args.limit is not None:
         selected_rows = selected_rows[: args.limit]
@@ -1783,10 +2362,13 @@ def main() -> int:
     if not output_dir.is_absolute():
         output_dir = base_dir / output_dir
     ai_model = args.ai_model or default_ai_model(args.ai_provider)
+    use_roof_reference_classification = roof_reference_feature_enabled(args.roof_reference_classification)
     if args.use_ai:
         api_key_name = "GEMINI_API_KEY" if args.ai_provider == "gemini" else "OPENAI_API_KEY"
         if not os.environ.get(api_key_name):
             raise RuntimeError(f"--use-ai requested, but {api_key_name} is not set")
+        if use_roof_reference_classification:
+            load_roof_reference_config()
 
     manifest = {
         "input": str(input_path),
@@ -1794,12 +2376,20 @@ def main() -> int:
         "state": requested_state,
         "county": requested_county,
         "zip_code": requested_zip,
+        "pcs_request": {
+            "enabled": pcs_request is not None,
+            "request_id": pcs_request.request_id if pcs_request else "",
+            "selection_type": pcs_request.selection_type if pcs_request else "",
+            "selected_parcels": len(pcs_request.properties) if pcs_request else 0,
+        },
+        "live_footprint_validation": not args.skip_live_footprint_validation,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "ai": {
             "requested": bool(args.use_ai),
             "provider": args.ai_provider,
             "model": ai_model,
             "allow_fallback": bool(args.allow_ai_fallback),
+            "roof_reference_classification": bool(use_roof_reference_classification),
         },
         "counts": {
             "rows_selected": len(selected_rows),
@@ -1818,7 +2408,32 @@ def main() -> int:
 
     for index, row in enumerate(selected_rows, start=args.start + 1):
         apply_requested_scope_defaults(row, requested_state, requested_county, requested_zip)
+        if not normalize_text(row.get("County")):
+            inferred_county = row_county_name(row)
+            if inferred_county != "Unknown-County":
+                row["County"] = inferred_county
         parcel = normalize_text(row.get("Parcel Number")) or f"row-{index}"
+        assessor_result = None
+        if pcs_request is not None:
+            county_key = normalize_text(row.get("County")).lower().replace(" county", "").replace(" ", "_")
+            assessor_result = assessor_results.get((county_key, normalize_identifier(parcel)))
+            if assessor_result is None:
+                raise RuntimeError(f"No assessor lookup result exists for selected parcel {parcel}")
+            apply_assessor_result_to_row(row, assessor_result)
+            footprint_validation = validate_assessor_footprint(
+                row.get("Building Footprint Sq Ft"), assessor_result.records
+            )
+            if footprint_validation.get("status") == "discrepancy":
+                raise RuntimeError(
+                    "Building footprint discrepancy needs attention for parcel "
+                    f"{parcel}: report footprint {footprint_validation['primary_sqft']:.0f} sq ft "
+                    f"versus explicit assessor footprint {footprint_validation['assessor_sqft']:.0f} sq ft "
+                    f"({footprint_validation['difference_pct']:.2f}% difference; 5% allowed)."
+                )
+            if footprint_validation.get("status") == "not_comparable":
+                warning = footprint_validation["reason"]
+                if warning not in assessor_result.warnings:
+                    assessor_result.warnings.append(warning)
         denver_path = resolve_path(base_dir, aerial_image_file_value(row))
         drcog_path = None
         dirs = row_output_dirs(output_dir, row)
@@ -1835,6 +2450,24 @@ def main() -> int:
             "status": "pending",
             "problems": [],
         }
+        if assessor_result is not None:
+            record_status["assessor"] = {
+                "record_count": len(assessor_result.records),
+                "source_counts": assessor_result.source_counts,
+                "detail_links": assessor_result.detail_links,
+                "warnings": assessor_result.warnings,
+            }
+
+        if not args.skip_live_footprint_validation and not args.cleanup_stale_only:
+            try:
+                record_status["footprint_validation"] = validate_report_row_footprints(row)
+            except Exception as exc:
+                record_status["status"] = "preflight_failed"
+                record_status["problems"].append(str(exc))
+                manifest["counts"]["preflight_failed"] += 1
+                manifest["records"].append(record_status)
+                print(f"Skipping {parcel}: {exc}")
+                continue
 
         matches_scope, scope_problems = row_matches_requested_scope(row, requested_state, requested_county, requested_zip)
         if not matches_scope:
@@ -1847,8 +2480,14 @@ def main() -> int:
 
         should_skip_existing = (args.skip_existing_reports or args.only_missing) and output_path.exists() and not args.force
         if should_skip_existing and args.retry_failed_ai and args.use_ai:
-            prior_source = existing_analysis_source(row, (data_dirs["json"], dirs["json"]), args.ai_provider)
-            should_skip_existing = prior_source in {"openai", "gemini"}
+            prior_analysis = existing_analysis_record(row, (data_dirs["json"], dirs["json"]), args.ai_provider)
+            prior_source = normalize_text(prior_analysis.get("source")).lower()
+            if use_roof_reference_classification:
+                reference_status = normalize_text((prior_analysis.get("reference_workflow") or {}).get("status")).lower()
+                should_skip_existing = prior_source in {"openai", "gemini"} and reference_status == "completed"
+                record_status["prior_reference_workflow_status"] = reference_status
+            else:
+                should_skip_existing = prior_source in {"openai", "gemini"}
             record_status["prior_analysis_source"] = prior_source
 
         if should_skip_existing:
@@ -1900,6 +2539,7 @@ def main() -> int:
                 args.ai_provider,
                 ai_model,
                 args.allow_ai_fallback,
+                use_roof_reference_classification,
             )
             analysis = apply_visual_risk_adjustment(analysis)
             analysis = apply_aerial_age_adjustment(row, analysis)

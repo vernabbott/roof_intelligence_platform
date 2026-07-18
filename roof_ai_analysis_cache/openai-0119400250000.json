@@ -1,0 +1,63 @@
+{
+  "best_image_source": "Denver GIS aerial photo dated 03/11/2018 - 03/17/2018",
+  "roof_type": "Low-slope commercial roof",
+  "roof_system": "PVC or Coated Roof",
+  "possible_roof_systems": [
+    {
+      "system": "PVC or Coated Roof",
+      "confidence": 78,
+      "evidence": "Large bright white low-slope field with smooth appearance and visible panel/field seams; uniform reflective surface is consistent with a single-ply membrane or a coated membrane viewed from aerial imagery."
+    },
+    {
+      "system": "TPO/PVC",
+      "confidence": 62,
+      "evidence": "White reflective membrane-like roof surface with straight seam lines and low-slope geometry commonly associated with TPO or PVC."
+    },
+    {
+      "system": "Modified Bitumen",
+      "confidence": 34,
+      "evidence": "Low-slope commercial roof form could also be a modified-bitumen assembly with a reflective coating, but aerial detail is insufficient to confirm."
+    }
+  ],
+  "roof_age_estimate": "Likely relatively new or recently renewed at time of imagery; apparent roof field looks clean and bright, though aerial imagery alone cannot confirm installation date or membrane type.",
+  "roof_pitch": "Low-slope / near-flat",
+  "overall_score": 74,
+  "condition_label": "Good-Fair",
+  "risk_level": "Moderate",
+  "ai_confidence": 76,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": false,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Several darkened rooftop areas/discoloration spots are visible on the white roof field, suggesting possible localized staining, repairs, or moisture/ponding-related wear.",
+      "Multiple rooftop penetrations/equipment clusters are visible across the roof, increasing flashing and seal maintenance risk.",
+      "No obvious tree overhang or major debris accumulation is visible from the aerial image."
+    ]
+  },
+  "observations": [
+    "White low-slope commercial roof with generally uniform reflective appearance.",
+    "Visible seams or joints run through the roof field, supporting a membrane or coated-membrane system.",
+    "Scattered dark spots and irregular discoloration are present on the roof surface.",
+    "Numerous rooftop units/penetrations and related curbs are visible, creating additional leak-prone details.",
+    "No clear standing water is visible in this aerial frame."
+  ],
+  "breakdown": {
+    "Membrane Condition": 72,
+    "Ponding": 78,
+    "Flashing & Seals": 68,
+    "Penetrations": 66,
+    "Overall Maintenance": 70
+  },
+  "summary": "Aerial imagery from 03/11/2018 - 03/17/2018 shows a low-slope commercial roof that appears generally serviceable and relatively recent-looking, with a bright white reflective surface consistent with a membrane or coated-membrane system. Visible darkened spots and localized discoloration introduce some concern for staining, prior repairs, or moisture-related wear, and the roof also has multiple penetrations/equipment that increase flashing and seal risk. No obvious ponded",
+  "recommendation": "The roof appears to be in good-fair condition overall, but the visible staining/discoloration and multiple penetrations warrant an onsite commercial roof inspection focused on flashing, seams, and any localized moisture-related distress. If the roof is otherwise sound and restoration-eligible, have a qualified commercial roof-coating contractor evaluate whether a silicone roof restoration is appropriate before considering a more costly overlay or replacement; a qualifying silicone system may reduce tear-off waste, cost, and disruption, create a seamless reflective cool-roof surface, help with ponding water resistance when properly designed and installed, improve UV and hail resistance, and may qualify for a manufacturer warranty of up to 20 years. If field testing or onsite inspection finds widespread moisture, failed insulation, structural/deck deterioration, or an incompatible substrate, pursue overlay or replacement evaluation. A one",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 1540,
+    "cached_input_tokens": 0,
+    "output_tokens": 766,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2306
+  }
+}

@@ -47,6 +47,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-ai", action="store_true", help="Use AI vision analysis for report generation")
     parser.add_argument("--ai-provider", choices=("openai", "gemini"), default="openai", help="AI provider")
     parser.add_argument("--ai-model", default=None, help="AI model override")
+    parser.add_argument(
+        "--roof-reference-classification",
+        action="store_true",
+        help="Use the feature-flagged two-stage roof-reference classification workflow",
+    )
     parser.add_argument("--allow-ai-fallback", action="store_true", help="Continue with fallback reports when AI fails")
     parser.add_argument("--skip-existing-reports", action="store_true", help="Skip PDFs that already exist")
     parser.add_argument("--only-missing", action="store_true", help="Alias for --skip-existing-reports")
@@ -167,6 +172,8 @@ def main() -> int:
                 report_command.extend(["--ai-provider", args.ai_provider])
             if args.ai_model:
                 report_command.extend(["--ai-model", args.ai_model])
+            if args.roof_reference_classification:
+                report_command.append("--roof-reference-classification")
             if args.allow_ai_fallback:
                 report_command.append("--allow-ai-fallback")
             if args.skip_existing_reports:

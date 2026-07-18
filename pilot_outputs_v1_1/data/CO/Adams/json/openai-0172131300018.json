@@ -1,0 +1,368 @@
+{
+  "best_image_source": "Esri World Imagery aerial photo dated 11/13/2025; closest reference comparison is the provided ballasted roof reference for 4201 E 72nd Ave",
+  "roof_type": "Mixed roof types",
+  "roof_system": "Mixed roof types: Ballasted, TPO",
+  "possible_roof_systems": [
+    {
+      "system": "ballasted",
+      "confidence": 82,
+      "evidence": "Large tan/brown aggregate field covers the main roof and attached rounded sections with a continuous granular texture and irregular stone pattern; the surface reads as loose ballast rather than a smooth single-ply sheet."
+    },
+    {
+      "system": "tar_and_gravel",
+      "confidence": 58,
+      "evidence": "The roof also shows a fine, dense aggregate appearance across broad areas, which can resemble gravel-surfaced BUR from aerial view; the underlying assembly cannot be confirmed visually."
+    },
+    {
+      "system": "coating",
+      "confidence": 30,
+      "evidence": "Some smaller attached light-toned roof areas appear smoother than the main aggregate field, but the imagery does not clearly show coating-specific application variation or exposed substrate."
+    },
+    {
+      "system": "tpo",
+      "confidence": 24,
+      "evidence": "The smaller light smooth-looking roof pieces could be a white/light single-ply membrane, but no seam grid or welded details are resolved well enough to confirm."
+    }
+  ],
+  "roof_age_estimate": "Appears mature/older in aerial appearance; exact age unknown. The 11/13/2025 imagery shows weathered aggregate and multiple rooftop penetrations, but age cannot be determined from imagery alone.",
+  "roof_pitch": "Low-slope/flat",
+  "overall_score": 68,
+  "condition_label": "FAIR",
+  "risk_level": "MODERATE",
+  "ai_confidence": 86,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": false,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": true,
+    "notes": [
+      "Broad roof-wide color variation and darker patches within the aggregate field may indicate weathering, retained moisture, staining, or localized repairs.",
+      "Numerous rooftop units, vents, curbs, and flashed penetrations increase leak risk on a low-slope assembly.",
+      "Trees overhang portions of the roof edge, creating debris and maintenance risk.",
+      "No clear standing water is resolved, but drainage performance cannot be verified from the aerial angle."
+    ]
+  },
+  "observations": [
+    "Visible risk factors include dark staining or inconsistent roof color, high penetration or rooftop-unit density, tree overhang or roof debris exposure.",
+    "Main roof field is a continuous tan/brown aggregate-surfaced low-slope assembly.",
+    "Several attached smaller roof sections are visible, including a rounded southern/western addition and smaller connector areas, and they appear to share the same aggregate surface or transition into smoother low-slope material.",
+    "Rooftop equipment, vents, and curbs are numerous across the roof, creating multiple flashing and seal points.",
+    "Perimeter and transition lines are visible, but seam or lap detail is not sufficiently resolved to confirm a specific hidden membrane beneath the aggregate."
+  ],
+  "breakdown": {
+    "Membrane Condition": 68,
+    "Ponding": 66,
+    "Flashing & Seals": 64,
+    "Penetrations": 58,
+    "Overall Maintenance": 62
+  },
+  "summary": "Esri World Imagery dated 11/13/2025 shows a commercial government building with a predominantly ballasted or gravel-surfaced low-slope roof and smaller attached roof sections of similar appearance. Visible risk factors include dark staining or inconsistent roof color, high penetration or rooftop-unit density, tree overhang or roof debris exposure.",
+  "recommendation": "Based on the visible aerial evidence, this roof should be treated as a mixed low-slope assembly with a dominant aggregate-surfaced roof and smaller attached sections that may be membrane or coated membrane. A qualified commercial roof-coating contractor should perform an onsite inspection, moisture testing where warranted, confirmation of the visible roof system and warranty eligibility, required repairs and preparation, and a reliable project-price proposal. If the aggregate-surfaced areas are structurally sound and moisture is not widespread, evaluate whether a silicone roof restoration system could be a cost-effective option before overlay or replacement; a qualifying silicone system may reduce tear-off waste, cost, and disruption, create a seamless monolithic white reflective cool-roof surface, improve resistance to UV exposure and hail, withstand ponding water when properly designed and installed, and qualify for a manufacturer\u2019s 0",
+  "building_classification": "mixed",
+  "roof_zones": [
+    {
+      "zone_id": "zone_1",
+      "location": "Dominant central and north roof field plus broad primary low-slope surface",
+      "roof_type": "ballasted",
+      "estimated_area_percentage": 70,
+      "confidence": 82,
+      "supporting_cues": [
+        "Continuous tan/brown granular field across the largest visible roof area",
+        "Irregular stone-like texture with three-dimensional mottling rather than a smooth sheet surface",
+        "Roof boundary follows an intentional, contiguous low-slope roof outline",
+        "No visible rigid metal panel geometry or resolved sheet-lap grid dominates the zone"
+      ],
+      "alternatives": [
+        "tar_and_gravel",
+        "unknown"
+      ],
+      "limitations": [
+        "Individual stones are only partly resolved from aerial height",
+        "Hidden membrane type cannot be determined",
+        "Some darker areas may reflect shadow, aging, or localized moisture"
+      ]
+    },
+    {
+      "zone_id": "zone_2",
+      "location": "Southern rounded addition and adjacent smaller attached low-slope section",
+      "roof_type": "ballasted",
+      "estimated_area_percentage": 15,
+      "confidence": 74,
+      "supporting_cues": [
+        "This attached section appears to share the same granular surfacing as the main roof",
+        "Rounded geometry still shows a continuous aggregate texture across the visible field",
+        "Material transition is not distinct enough to support a different primary system"
+      ],
+      "alternatives": [
+        "tar_and_gravel",
+        "coating",
+        "tpo"
+      ],
+      "limitations": [
+        "Small area with partial obstruction and limited seam detail",
+        "A smooth coated or membrane surface cannot be fully excluded at the smallest attached areas"
+      ]
+    },
+    {
+      "zone_id": "zone_3",
+      "location": "East-side connector/canopy and smaller attached roof appendages",
+      "roof_type": "tpo",
+      "estimated_area_percentage": 15,
+      "confidence": 34,
+      "supporting_cues": [
+        "Light-toned smooth-looking low-slope pieces are visible in the attachment area",
+        "No exposed aggregate texture is as clear as on the primary field",
+        "Could represent a different small roof field from the dominant aggregate assembly"
+      ],
+      "alternatives": [
+        "coating",
+        "unknown",
+        "ballasted"
+      ],
+      "limitations": [
+        "Very limited size and resolution",
+        "No resolved seams, welds, or manufacturer details",
+        "Roof components and shadows obscure the material boundary"
+      ]
+    }
+  ],
+  "source": "openai",
+  "usage": {
+    "input_tokens": 36247,
+    "cached_input_tokens": 0,
+    "output_tokens": 2048,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 38295,
+    "by_stage": {
+      "candidate_classification": {
+        "input_tokens": 3491,
+        "cached_input_tokens": 0,
+        "output_tokens": 709,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 4200
+      },
+      "reference_comparison": {
+        "input_tokens": 32756,
+        "cached_input_tokens": 0,
+        "output_tokens": 1339,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 34095
+      }
+    }
+  },
+  "reference_workflow": {
+    "enabled": true,
+    "status": "completed",
+    "workflow_version": "1.1",
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "manifest": {
+      "path": "docs/ai/roof_reference_manifest.yaml",
+      "sha256": "1596d9d85230d4a012b4b215db5f751743b231beb55cf36ec15ce8ffd76960ad",
+      "size_bytes": 5108,
+      "modified_ns": 1784053293415537773
+    },
+    "classification_guide": {
+      "path": "docs/ai/roof_type_classification.md",
+      "sha256": "a723e46b835c0555674ddb4497520292c48cbb54c64c5d6a93b42387bb0ac029",
+      "size_bytes": 8979,
+      "modified_ns": 1784053691253053131
+    },
+    "guides": [
+      {
+        "path": "docs/ai/roof_reference_library/tpo/tpo_roof_identification.md",
+        "sha256": "7c5f87b6a5ce0c25436269e4cb5487240cdf7be3ad8b78352f2e87e95af85e0b",
+        "size_bytes": 13804,
+        "modified_ns": 1784052459479528357
+      },
+      {
+        "path": "docs/ai/roof_reference_library/mod_bit/mod_bit_roof_identification.md",
+        "sha256": "49aeedc0f5a870d976d857b5ddd679e839b82f2c62fff1f30faa74e4210e2c82",
+        "size_bytes": 8544,
+        "modified_ns": 1784052411781284458
+      },
+      {
+        "path": "docs/ai/roof_reference_library/ballasted/ballasted_roof_identification.md",
+        "sha256": "d7f0a292cfa3d3787e4f0c17934f18d34d5a620a83b02d898cc0e20eecb04129",
+        "size_bytes": 13928,
+        "modified_ns": 1784053578815000078
+      },
+      {
+        "path": "docs/ai/roof_reference_library/epdm/epdm_roof_identification.md",
+        "sha256": "621a95ff63ca398ecef524dadec076406a0eafc2eb76be0b74f0a801c451cbf2",
+        "size_bytes": 10539,
+        "modified_ns": 1784052411685285541
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tar_and_gravel/tar_and_gravel_roof_identification.md",
+        "sha256": "e2a7a5440340c42ad55e5807198e15d83997d175bc7fc737b5bb64e6f2a90cca",
+        "size_bytes": 9251,
+        "modified_ns": 1784044432600625682
+      }
+    ],
+    "reference_images": [
+      {
+        "path": "docs/ai/roof_reference_library/tpo/images/tpo_003.jpeg",
+        "sha256": "b8bf4a1267d0e787f9eb30338792bf3136ec29bb4dc1dd38a8d46de037e0b776",
+        "size_bytes": 29129,
+        "modified_ns": 1783982796960450243
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tpo/images/tpo_004.jpg",
+        "sha256": "1071eba893a0b224dfacefd60e0877e6c4747ad0b51aad18965d56bd5a9ef15f",
+        "size_bytes": 487595,
+        "modified_ns": 1784038229983779091
+      },
+      {
+        "path": "docs/ai/roof_reference_library/mod_bit/images/mod_bit_001.jpg",
+        "sha256": "ce33ba9986e8ce3ea6abbae4a27bb2522e45e2f3b610eabcc93ddadccf4b61ae",
+        "size_bytes": 573394,
+        "modified_ns": 1784039070148285278
+      },
+      {
+        "path": "docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg",
+        "sha256": "00921c84ae58d798aae08ffa04b508c85bf80cccb13c1c263a4c6c00106a612c",
+        "size_bytes": 34188,
+        "modified_ns": 1784039258421680913
+      },
+      {
+        "path": "docs/ai/roof_reference_library/ballasted/images/ballasted_003.jpg",
+        "sha256": "d79ff00786825b1cbe7a4d8ef89deb24ae998235cbd4732b5e96c072482529da",
+        "size_bytes": 871018,
+        "modified_ns": 1784036531414910055
+      },
+      {
+        "path": "docs/ai/roof_reference_library/ballasted/images/ballasted_005.jpg",
+        "sha256": "dd2a2e19e1e3f85f6b7f272e6f17230ef1a7cc4f55045b704aa53ab43512ede4",
+        "size_bytes": 1363758,
+        "modified_ns": 1784050810180097555
+      },
+      {
+        "path": "docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg",
+        "sha256": "aa7982fa734abebd215ae18b2a93db45ee20f5a0252be3c426c820da4332bb2b",
+        "size_bytes": 125994,
+        "modified_ns": 1783983241876001266
+      },
+      {
+        "path": "docs/ai/roof_reference_library/epdm/images/epdm_004.jpg",
+        "sha256": "ed70739a15effb59979ac1a5d9e454925353569ce11fcd7508bfaee5c0dba4ec",
+        "size_bytes": 565477,
+        "modified_ns": 1784038532673316747
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_004.jpeg",
+        "sha256": "ae6cf5eb5feaa74d7df519ea288741c40dff42c8c25948d22c6718aeca1b2c38",
+        "size_bytes": 245508,
+        "modified_ns": 1784039694074052514
+      },
+      {
+        "path": "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_005.jpeg",
+        "sha256": "09bff2aebb631dc48f3a408568b5f56197ed64d8fa9228a6d59a7971b5f86a6e",
+        "size_bytes": 816291,
+        "modified_ns": 1784039649886059960
+      }
+    ],
+    "stage1": {
+      "building_classification": "mixed",
+      "roof_zones": [
+        {
+          "zone_id": "zone_1",
+          "location": "Main large central roof field and curved north roof field",
+          "estimated_area_percentage": 70,
+          "candidates": [
+            {
+              "roof_type": "coating",
+              "confidence": 48,
+              "evidence": "Large smooth light tan/beige low-slope field with broad unbroken appearance; no resolved sheet seams or panel ribs. The color and evenness could reflect a coated roof, but membrane chemistry cannot be confirmed from the aerial view."
+            },
+            {
+              "roof_type": "tpo",
+              "confidence": 32,
+              "evidence": "Light-colored smooth low-slope roof surface that could be a white or light membrane viewed in warm lighting; however seams are not resolved, so this is only a conservative fallback."
+            },
+            {
+              "roof_type": "pvc",
+              "confidence": 18,
+              "evidence": "Uniform light membrane-like appearance is also consistent with PVC, but there is no PVC-specific evidence such as markings or clearly resolved thermoplastic details."
+            }
+          ],
+          "limitations": [
+            "Strong sun/shadow and image resolution prevent separation of coating versus single-ply membrane.",
+            "No reliable seam or flash evidence is visible across most of the field.",
+            "Color alone is insufficient to establish exact membrane chemistry."
+          ]
+        },
+        {
+          "zone_id": "zone_2",
+          "location": "Southwest rounded addition and adjacent lower roof extension",
+          "estimated_area_percentage": 15,
+          "candidates": [
+            {
+              "roof_type": "coating",
+              "confidence": 44,
+              "evidence": "This attached roof section has the same smooth light tan field as the main roof, with no visible granular texture or rigid metal panel geometry. A reflective or aging coating remains plausible."
+            },
+            {
+              "roof_type": "tpo",
+              "confidence": 30,
+              "evidence": "The zone appears as a smooth light membrane-like low-slope surface, so TPO is a conservative default if it is a single-ply roof."
+            },
+            {
+              "roof_type": "unknown",
+              "confidence": 16,
+              "evidence": "The visible detail is insufficient to distinguish a membrane from a coated surface with confidence."
+            }
+          ],
+          "limitations": [
+            "Small attachments are visible but not enough detail to resolve material family precisely.",
+            "Rounded geometry and shadowing obscure surface cues.",
+            "No clear lap grid, aggregate, or metal ribs are visible."
+          ]
+        },
+        {
+          "zone_id": "zone_3",
+          "location": "Small right-side connector/canopy and minor roof appendages along the east edge",
+          "estimated_area_percentage": 15,
+          "candidates": [
+            {
+              "roof_type": "tpo",
+              "confidence": 28,
+              "evidence": "Small light-toned low-slope roof pieces appear smooth and membrane-like, which is most conservatively treated as TPO when exact chemistry cannot be separated."
+            },
+            {
+              "roof_type": "coating",
+              "confidence": 24,
+              "evidence": "The same light finish could also be a coated surface; lack of resolved seams or substrate clues keeps coating in the running."
+            },
+            {
+              "roof_type": "unknown",
+              "confidence": 20,
+              "evidence": "The appendage is small and partially obstructed, so the surface type cannot be established responsibly."
+            }
+          ],
+          "limitations": [
+            "Very small visible area and rooftop objects limit surface interpretation.",
+            "Potential parapets, flashings, and equipment pads complicate the view.",
+            "No clear evidence for metal, ballast, or asphaltic surfacing is present."
+          ]
+        }
+      ],
+      "overall_limitations": [
+        "No zone shows clear metal ribs, ballast stone, or aggregate-surfaced BUR.",
+        "The roof appears to be mostly smooth light low-slope surfacing, but the imagery does not support exact membrane chemistry.",
+        "Estimated area percentages are approximate and based on visible roof plan rather than measured footprint."
+      ]
+    },
+    "selected_reference_types": [
+      "tpo",
+      "mod_bit",
+      "ballasted",
+      "epdm",
+      "tar_and_gravel"
+    ]
+  },
+  "visual_risk_score_cap": 72,
+  "aerial_age_adjustment_applied": false,
+  "aerial_photo_age_years": 0.7,
+  "aerial_age_score_adjustment": 0
+}

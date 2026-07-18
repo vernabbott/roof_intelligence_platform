@@ -1,0 +1,149 @@
+[
+  {
+    "county": "Adams",
+    "parcel": "0172133301001",
+    "address": "7200 QUEBEC PKWY",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/0172133301001-7200-quebec-pkwy-aerial.jpg",
+    "previous_size": [
+      1024,
+      1024
+    ],
+    "previous_edge_stddev": 36.98,
+    "new_source": "Esri World Imagery",
+    "new_photo_date": "20251113",
+    "new_native_resolution_m": "0.34",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/world_imagery/0172133301001-world_imagery-ai-crop.jpg",
+    "new_size": [
+      640,
+      640
+    ],
+    "new_edge_stddev": 48.9,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/0172133301001-7200-quebec-pkwy-comparison.jpg"
+  },
+  {
+    "county": "Adams",
+    "parcel": "0182317107020",
+    "address": "5101 QUEBEC ST",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/0182317107020-5101-quebec-st-aerial.jpg",
+    "previous_size": [
+      1024,
+      1024
+    ],
+    "previous_edge_stddev": 39.95,
+    "new_source": "Esri World Imagery",
+    "new_photo_date": "20251113",
+    "new_native_resolution_m": "0.34",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/world_imagery/0182317107020-world_imagery-ai-crop.jpg",
+    "new_size": [
+      640,
+      640
+    ],
+    "new_edge_stddev": 50.25,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/0182317107020-5101-quebec-st-comparison.jpg"
+  },
+  {
+    "county": "Adams",
+    "parcel": "0182512101037",
+    "address": "6345 COLORADO BLVD",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/0182512101037-6345-colorado-blvd-aerial.jpg",
+    "previous_size": [
+      1024,
+      1024
+    ],
+    "previous_edge_stddev": 21.07,
+    "new_source": "Esri World Imagery",
+    "new_photo_date": "20251113",
+    "new_native_resolution_m": "0.34",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/world_imagery/0182512101037-world_imagery-ai-crop.jpg",
+    "new_size": [
+      640,
+      640
+    ],
+    "new_edge_stddev": 24.94,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/0182512101037-6345-colorado-blvd-comparison.jpg"
+  },
+  {
+    "county": "Adams",
+    "parcel": "0172131300018",
+    "address": "4201 E 72ND AVE",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/0172131300018-4201-e-72nd-ave-aerial.jpg",
+    "previous_size": [
+      1024,
+      1024
+    ],
+    "previous_edge_stddev": 49.17,
+    "new_source": "Esri World Imagery",
+    "new_photo_date": "20251113",
+    "new_native_resolution_m": "0.34",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/aerial_imagery/world_imagery/0172131300018-world_imagery-ai-crop.jpg",
+    "new_size": [
+      640,
+      640
+    ],
+    "new_edge_stddev": 46.35,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/0172131300018-4201-e-72nd-ave-comparison.jpg"
+  },
+  {
+    "county": "Jefferson",
+    "parcel": "4917406019",
+    "address": "12364 W ALAMEDA PKWY",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/aerial_imagery/4917406019-12364-w-alameda-pkwy-aerial.jpg",
+    "previous_size": [
+      640,
+      640
+    ],
+    "previous_edge_stddev": 39.3,
+    "new_source": "Jefferson County DRAPP 2022",
+    "new_photo_date": "2022",
+    "new_native_resolution_m": "0.15240030480060823",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/aerial_imagery/jeffco_drapp_2022/4917406019-jeffco_drapp_2022-ai-crop.jpg",
+    "new_size": [
+      1024,
+      1024
+    ],
+    "new_edge_stddev": 40.4,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/4917406019-12364-w-alameda-pkwy-comparison.jpg"
+  },
+  {
+    "county": "Jefferson",
+    "parcel": "4917105011",
+    "address": "12043 W ALAMEDA PKWY",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/aerial_imagery/4917105011-12043-w-alameda-pkwy-aerial.jpg",
+    "previous_size": [
+      640,
+      640
+    ],
+    "previous_edge_stddev": 46.1,
+    "new_source": "Jefferson County DRAPP 2022",
+    "new_photo_date": "2022",
+    "new_native_resolution_m": "0.15240030480060823",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/aerial_imagery/jeffco_drapp_2022/4917105011-jeffco_drapp_2022-ai-crop.jpg",
+    "new_size": [
+      1024,
+      1024
+    ],
+    "new_edge_stddev": 46.34,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/4917105011-12043-w-alameda-pkwy-comparison.jpg"
+  },
+  {
+    "county": "Jefferson",
+    "parcel": "4917423001",
+    "address": "12250 W KENTUCKY DR",
+    "previous_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/aerial_imagery/4917423001-12250-w-kentucky-dr-aerial.jpg",
+    "previous_size": [
+      640,
+      640
+    ],
+    "previous_edge_stddev": 34.57,
+    "new_source": "Jefferson County DRAPP 2022",
+    "new_photo_date": "2022",
+    "new_native_resolution_m": "0.15240030480060823",
+    "new_file": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Jefferson/aerial_imagery/jeffco_drapp_2022/4917423001-jeffco_drapp_2022-ai-crop.jpg",
+    "new_size": [
+      1021,
+      1021
+    ],
+    "new_edge_stddev": 37.31,
+    "comparison": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/imagery_validation/4917423001-12250-w-kentucky-dr-comparison.jpg"
+  }
+]

@@ -1,0 +1,51 @@
+{
+  "input": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/parcels/adams_80022_buildings_with_parcels.csv",
+  "output_dir": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1",
+  "state": "CO",
+  "county": "Adams",
+  "zip_code": "80022",
+  "started_at": "2026-07-14T15:46:00",
+  "ai": {
+    "requested": true,
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "allow_fallback": true,
+    "roof_reference_classification": true
+  },
+  "counts": {
+    "rows_selected": 1,
+    "generated": 1,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 1,
+    "fallback": 0,
+    "blank_or_missing_images": 0,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "records": [
+    {
+      "row": 6,
+      "parcel": "0182512101037",
+      "address": "6345 COLORADO BLVD",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/CO/80022/Reports/0182512101037-6345-colorado-blvd.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 160.84,
+        "contrast": 58.01,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    }
+  ],
+  "finished_at": "2026-07-14T15:46:31"
+}

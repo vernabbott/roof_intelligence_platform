@@ -1,0 +1,51 @@
+{
+  "input": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/data/CO/Adams/parcels/adams_80022_buildings_with_parcels.csv",
+  "output_dir": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1",
+  "state": "CO",
+  "county": "Adams",
+  "zip_code": "80022",
+  "started_at": "2026-07-14T15:12:16",
+  "ai": {
+    "requested": true,
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "allow_fallback": true,
+    "roof_reference_classification": true
+  },
+  "counts": {
+    "rows_selected": 1,
+    "generated": 1,
+    "skipped_existing": 0,
+    "preflight_failed": 0,
+    "failed": 0,
+    "ai": 1,
+    "fallback": 0,
+    "blank_or_missing_images": 0,
+    "stale_files_removed": 0,
+    "cleanup_only": 0
+  },
+  "records": [
+    {
+      "row": 5,
+      "parcel": "0182317107020",
+      "address": "5101 QUEBEC ST",
+      "state": "CO",
+      "county": "Adams",
+      "zip_code": "80022",
+      "report": "/Users/vernabbott/Library/CloudStorage/OneDrive-Personal/Visual Studio/PilotPoint IQ Roof Intelligence Report/pilot_outputs_v1_1/CO/80022/Reports/0182317107020-5101-quebec-st.pdf",
+      "status": "generated",
+      "problems": [],
+      "image": {
+        "exists": true,
+        "blank": false,
+        "width": 1024,
+        "height": 1024,
+        "brightness": 139.78,
+        "contrast": 64.26,
+        "reason": ""
+      },
+      "analysis_source": "openai"
+    }
+  ],
+  "finished_at": "2026-07-14T15:12:47"
+}

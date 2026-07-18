@@ -1,0 +1,64 @@
+{
+  "best_image_source": "Denver GIS aerial photo dated 03/11/2018 - 03/17/2018",
+  "roof_type": "Low-slope commercial warehouse roof",
+  "roof_system": "Primarily low-slope membrane roof; exact membrane type not fully resolvable from aerial imagery alone. Large flat roof fields appear consistent with a single-ply or coated membrane assembly over an industrial warehouse.",
+  "possible_roof_systems": [
+    {
+      "system": "TPO/PVC",
+      "confidence": 54,
+      "evidence": "Large, flat low-slope field with generally uniform light tan/gray appearance and broad seam/field divisions that could fit a single-ply membrane, though weathering and image resolution limit confirmation."
+    },
+    {
+      "system": "EPDM",
+      "confidence": 42,
+      "evidence": "Some darker roof areas and uniform flat sections could also be consistent with an aged EPDM field, but the color and detail are insufficient to confirm rubber membrane from aerial view alone."
+    },
+    {
+      "system": "Coated Roof",
+      "confidence": 37,
+      "evidence": "Overall muted, fairly uniform surface tone on a large industrial roof could indicate a membrane with coating, but there is no close-up detail to verify coating texture or continuity."
+    }
+  ],
+  "roof_age_estimate": "Likely older low-slope commercial roof, consistent with a 1973 industrial warehouse; visible roof field suggests a service-aged system, but precise installation age is not discernible from aerial imagery.",
+  "roof_pitch": "Flat to very low-slope",
+  "overall_score": 58,
+  "condition_label": "Fair",
+  "risk_level": "Moderate",
+  "ai_confidence": 77,
+  "visual_risk_factors": {
+    "dark_staining_or_discoloration": true,
+    "suspected_ponding": true,
+    "high_penetration_density": true,
+    "overhanging_trees_or_debris": false,
+    "notes": [
+      "Noticeable darkened/stained roof areas are visible on portions of the roof field, especially toward the upper/right-central areas, suggesting possible recurring moisture, repairs, or drainage issues.",
+      "Several linear darker bands and localized discoloration could indicate ponding history or differential aging.",
+      "The roof has many penetrations, curbs, vents, and rooftop units, which increases flashing and leak risk on a low-slope assembly.",
+      "No obvious overhanging trees are visible at the roof edge in this image."
+    ]
+  },
+  "observations": [
+    "Large industrial warehouse with extensive flat roof area and multiple distinct roof sections.",
+    "Numerous rooftop penetrations, curbs, vents, and mechanical units are present across the roof field.",
+    "Visible darker staining/discoloration and uneven roof coloration occur in several areas.",
+    "No clear signs of severe membrane failure, open tears, or large exposed substrate are visible from the aerial view.",
+    "Image resolution does not allow reliable identification of exact membrane chemistry or hidden wet insulation conditions."
+  ],
+  "breakdown": {
+    "Membrane Condition": 60,
+    "Ponding": 55,
+    "Flashing & Seals": 52,
+    "Penetrations": 50,
+    "Overall Maintenance": 56
+  },
+  "summary": "Aerial imagery from 03/11/2018 - 03/17/2018 shows a large low-slope industrial warehouse roof in fair condition with moderate serviceability risk. The roof appears to be a broad membrane-type assembly, but exact material cannot be confirmed from the aerial view. Visible dark staining/discoloration and uneven color patterns suggest possible ponding history, localized moisture retention, or prior repairs. The roof also has many penetrations, curbs, vents, and mechanical/ro",
+  "recommendation": "Have a qualified commercial roofing contractor perform an onsite inspection with moisture testing where warranted, verify the membrane type and flashing condition, and estimate repair scope and project pricing. If the roof is generally sound and restoration-compatible, evaluate silicone roof restoration before a more costly overlay or replacement; a qualifying silicone system may reduce tear-off waste, cost, and disruption, create a seamless monolithic white reflective cool-roof surface, withstand ponding water when properly designed and installed, improve resistance to UV exposure and hail, and may qualify for a manufacturer warranty of up to 20 years. If field testing shows widespread moisture, failed insulation, structural/deck deterioration, or an incompatible substrate, pursue overlay or replacement evaluation instead.",
+  "source": "openai",
+  "usage": {
+    "input_tokens": 2043,
+    "cached_input_tokens": 0,
+    "output_tokens": 842,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 2885
+  }
+}

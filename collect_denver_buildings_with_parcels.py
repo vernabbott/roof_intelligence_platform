@@ -12,7 +12,7 @@ import sys
 import time
 from datetime import date
 from io import BytesIO
-from math import floor
+from math import ceil, floor
 from typing import Iterable
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlencode, urlparse
@@ -50,7 +50,7 @@ AI_CROP_TILE_SERVICE_URL = (
     "Aerial2018_tilecache/MapServer"
 )
 AI_CROP_TILE_LEVEL = 19
-AI_CROP_BUFFER_FEET = 100.0
+AI_CROP_BUFFER_FEET = 40.0
 AI_CROP_PIXELS = 1536
 AI_CROP_FORMAT = "jpg"
 
@@ -131,6 +131,17 @@ OPTIONAL_PARCEL_ZIP_FIELDS = [
 ]
 
 OPTIONAL_PARCEL_FIELDS = [
+    "ParcelNo",
+    "PARCELNUMBER",
+    "PARCELNUM",
+    "PARCEL_SPN",
+    "PARCEL",
+    "PropertyAddress",
+    "SITUS_FULL_ADDRESS",
+    "LOCADDRESS",
+    "LOCZIPCODE",
+    "LOCCITY",
+    "SITUS",
     "PARCELID",
     "SPN",
     "AIN",
@@ -214,6 +225,7 @@ PARCEL_CACHE_EXTRA_FIELDS = [
 
 _COLLECT_PARCEL_FIELDS: list[str] | None = None
 _COLLECT_BUILDING_FIELDS: list[str] | None = None
+_LAYER_OID_FIELDS: dict[str, str] = {}
 
 OUTPUT_FIELDS = [
     ("county", "County"),
@@ -235,6 +247,7 @@ OUTPUT_FIELDS = [
     ("primary_aerial_source", "Primary Aerial Source"),
     ("primary_aerial_image_url", "Primary Aerial Image URL"),
     ("primary_aerial_photo_date", "Primary Aerial Photo Date"),
+    ("primary_aerial_native_resolution", "Primary Aerial Native Resolution"),
     ("primary_aerial_image_file", "Primary Aerial Image File"),
     ("primary_aerial_qa_status", "Primary Aerial QA Status"),
     ("primary_aerial_qa_reason", "Primary Aerial QA Reason"),
@@ -259,15 +272,13 @@ TRANSFORMER_TO_PARCEL = None
 TRANSFORMER_TO_BUILDING = None
 TRANSFORMER_TO_IMAGE = None
 TRANSFORMER_TO_DRCOG_TILE = None
+BUILDING_SOURCE_KIND = "arcgis"
 
 
 def metadata_url(url: str) -> str:
     clean_url = url.split("?", 1)[0].rstrip("/")
     if clean_url.endswith("/query"):
         clean_url = clean_url[: -len("/query")]
-    marker = "/FeatureServer"
-    if marker in clean_url:
-        clean_url = clean_url.split(marker, 1)[0] + marker
     return clean_url
 
 
@@ -309,14 +320,21 @@ def inspect_service_metadata(url: str) -> dict:
     meta = fetch_json(metadata_url(url))
     if not meta:
         return {}
-    sr = meta.get("spatialReference") or {}
+    sr = (
+        meta.get("spatialReference")
+        or (meta.get("extent") or {}).get("spatialReference")
+        or meta.get("sourceSpatialReference")
+        or {}
+    )
     return sr
 
 
-def init_crs_transformers(building_url: str, parcel_url: str) -> None:
+def init_crs_transformers(
+    building_url: str, parcel_url: str, building_crs: int | None = None
+) -> None:
     """Inspect services and initialize CRS and Transformers globally."""
     global BUILDING_CRS, PARCEL_CRS, TRANSFORMER_TO_PARCEL, TRANSFORMER_TO_BUILDING, TRANSFORMER_TO_IMAGE, TRANSFORMER_TO_DRCOG_TILE
-    bmeta = inspect_service_metadata(building_url)
+    bmeta = inspect_service_metadata(building_url) if building_url else {}
     pmeta = inspect_service_metadata(parcel_url)
     # spatialReference may include wkid or latestWkid
     def pick_wkid(meta: dict):
@@ -329,8 +347,14 @@ def init_crs_transformers(building_url: str, parcel_url: str) -> None:
                 return int(meta[key])
         return None
 
-    BUILDING_CRS = pick_wkid(bmeta) or BUILDING_CRS
-    PARCEL_CRS = pick_wkid(pmeta) or PARCEL_CRS
+    BUILDING_CRS = building_crs or pick_wkid(bmeta)
+    PARCEL_CRS = pick_wkid(pmeta)
+
+    if BUILDING_CRS is None or PARCEL_CRS is None:
+        raise RuntimeError(
+            "Unable to determine building/parcel coordinate systems; "
+            "aborting before aerial imagery can be requested at the wrong location."
+        )
 
     print(f"Buildings CRS: {BUILDING_CRS}")
     print(f"Parcels CRS: {PARCEL_CRS}")
@@ -410,6 +434,11 @@ def build_polygon_from_esri(geometry: dict | None, transform_to_parcel: bool = F
 
 
 def fetch_page(url: str, where: str, offset: int, out_fields: Iterable[str], return_geometry: bool = False) -> dict:
+    oid_field = _LAYER_OID_FIELDS.get(url)
+    if not oid_field:
+        metadata = fetch_json(layer_metadata_url(url)) or {}
+        oid_field = str(metadata.get("objectIdField") or metadata.get("objectIdFieldName") or "OBJECTID")
+        _LAYER_OID_FIELDS[url] = oid_field
     params = {
         "where": where,
         "outFields": ",".join(out_fields),
@@ -417,7 +446,7 @@ def fetch_page(url: str, where: str, offset: int, out_fields: Iterable[str], ret
         "f": "json",
         "resultOffset": offset,
         "resultRecordCount": PAGE_SIZE,
-        "orderByFields": "OBJECTID ASC",
+        "orderByFields": f"{oid_field} ASC",
     }
     full_url = url + "?" + urlencode(params)
     return fetch_arcgis_json(full_url)
@@ -554,6 +583,7 @@ def parcel_zip(record: dict) -> str:
         "Zip",
         "PRPZIP5",
         "loczip",
+        "LOCZIPCODE",
     ):
         zip_code = normalize_zip(record.get(field))
         if zip_code:
@@ -631,6 +661,12 @@ def get_parcel_bounds_in_building_crs(parcels: list[dict]) -> str | None:
 
 def collect_buildings(fetch_limit: int | None = None, geometry: str | None = None) -> list[dict]:
     """Fetch buildings, optionally constrained by a geometry filter."""
+    if BUILDING_SOURCE_KIND == "postgis":
+        if not geometry:
+            raise ValueError("PostGIS building discovery requires a selected geometry envelope")
+        from building_footprint_store import collect_buildings_in_envelope
+
+        return collect_buildings_in_envelope(ACTIVE_COUNTY_NAME, geometry, fetch_limit)
     offset = 0
     results: list[dict] = []
     while True:
@@ -644,6 +680,125 @@ def collect_buildings(fetch_limit: int | None = None, geometry: str | None = Non
         if len(features) < PAGE_SIZE:
             break
     return results
+
+
+def geometry_area_sqft_wgs84(geometry_text: str) -> float:
+    polygon = build_polygon_from_wkt(geometry_text)
+    if polygon is None:
+        return 0.0
+    projected = transform(Transformer.from_crs(4326, 26913, always_xy=True).transform, polygon)
+    return float(projected.area) * 10.76391041671
+
+
+def collect_secondary_buildings(
+    fetch_limit: int | None = None, geometry: str | None = None
+) -> list[dict]:
+    """Fetch a bounded county footprint layer when PostGIS is the primary source."""
+    if BUILDING_SOURCE_KIND != "postgis" or not DENVER_BUILDINGS_URL:
+        return []
+    if not geometry:
+        raise ValueError("Secondary building discovery requires a selected geometry envelope")
+    row_limit = min(int(fetch_limit or 10_000), 10_000)
+    offset = 0
+    records: list[dict] = []
+    fields = collect_available_fields(
+        DENVER_BUILDINGS_URL, BUILDING_FIELDS + OPTIONAL_BUILDING_FIELDS
+    )
+    oid_field = _LAYER_OID_FIELDS.get(DENVER_BUILDINGS_URL)
+    if not oid_field:
+        metadata = fetch_json(layer_metadata_url(DENVER_BUILDINGS_URL)) or {}
+        oid_field = str(
+            metadata.get("objectIdField")
+            or metadata.get("objectIdFieldName")
+            or "OBJECTID"
+        )
+        _LAYER_OID_FIELDS[DENVER_BUILDINGS_URL] = oid_field
+    while len(records) < row_limit:
+        params = {
+            "where": "1=1",
+            "outFields": ",".join(fields),
+            "returnGeometry": "true",
+            "geometry": geometry,
+            "geometryType": "esriGeometryEnvelope",
+            "spatialRel": "esriSpatialRelIntersects",
+            "inSR": "4326",
+            "outSR": "4326",
+            "resultOffset": offset,
+            "resultRecordCount": min(PAGE_SIZE, row_limit - len(records)),
+            "orderByFields": f"{oid_field} ASC",
+            "f": "json",
+        }
+        page = fetch_arcgis_json(DENVER_BUILDINGS_URL + "?" + urlencode(params))
+        features = page.get("features") or []
+        for feature in features:
+            attrs = dict(feature.get("attributes") or {})
+            geometry_text = geometry_to_wkt(feature.get("geometry"))
+            attrs.update(
+                {
+                    "building_esri_geometry": feature.get("geometry"),
+                    "building_geometry": geometry_text,
+                    "footprint_sqft": geometry_area_sqft_wgs84(geometry_text),
+                    "footprint_source": "county_gis",
+                    "year_built": "",
+                    "effective_year_built": "",
+                }
+            )
+            records.append(attrs)
+        if len(features) < min(PAGE_SIZE, row_limit - offset):
+            break
+        offset += len(features)
+    return records[:row_limit]
+
+
+def validate_building_footprint_sources(
+    primary_record: dict,
+    secondary_buildings: list[dict],
+    tolerance: float = 0.05,
+) -> dict:
+    """Compare the selected Supabase footprint with the overlapping county footprint."""
+    primary_polygon = build_polygon_from_wkt(primary_record.get("building_geometry") or "")
+    primary_area = numeric_value(
+        primary_record.get("footprint_sqft")
+        or primary_record.get("building_footprint_sqft")
+        or primary_record.get("projected_building_footprint_area")
+    )
+    if primary_polygon is None or not primary_area:
+        return {"status": "primary_unavailable", "primary_sqft": primary_area or 0.0}
+
+    projected_primary = transform(
+        Transformer.from_crs(4326, 26913, always_xy=True).transform, primary_polygon
+    )
+    best: tuple[float, dict] | None = None
+    for record in secondary_buildings:
+        polygon = build_polygon_from_wkt(record.get("building_geometry") or "")
+        if polygon is None:
+            continue
+        projected = transform(
+            Transformer.from_crs(4326, 26913, always_xy=True).transform, polygon
+        )
+        intersection = projected_primary.intersection(projected).area
+        if intersection <= 0:
+            continue
+        overlap = intersection / max(projected_primary.union(projected).area, 1.0)
+        if best is None or overlap > best[0]:
+            best = (overlap, record)
+
+    if best is None:
+        return {
+            "status": "primary_only",
+            "primary_sqft": round(float(primary_area), 1),
+            "secondary_sqft": 0.0,
+        }
+    secondary_area = numeric_value(best[1].get("footprint_sqft")) or 0.0
+    difference = abs(float(primary_area) - secondary_area) / max(float(primary_area), 1.0)
+    return {
+        "status": "validated" if difference <= tolerance else "discrepancy",
+        "primary_sqft": round(float(primary_area), 1),
+        "secondary_sqft": round(secondary_area, 1),
+        "difference_pct": round(difference * 100, 2),
+        "overlap_pct": round(best[0] * 100, 2),
+        "tolerance_pct": round(tolerance * 100, 2),
+    }
 
 
 def collect_building_page(offset: int, geometry: str | None = None) -> list[dict]:
@@ -728,7 +883,18 @@ def build_polygon_from_wkt(wkt_text: str) -> object | None:
 
 
 def get_building_polygon(record: dict) -> object | None:
-    return build_polygon_from_esri(record.get("building_esri_geometry"), transform_to_parcel=True)
+    polygon = build_polygon_from_esri(record.get("building_esri_geometry"), transform_to_parcel=True)
+    if polygon is not None:
+        return polygon
+    polygon = build_polygon_from_wkt(record.get("building_geometry") or "")
+    if polygon is None:
+        return None
+    if TRANSFORMER_TO_PARCEL is not None:
+        try:
+            polygon = transform(TRANSFORMER_TO_PARCEL.transform, polygon)
+        except Exception:
+            return None
+    return polygon if not polygon.is_empty else None
 
 
 def get_parcel_polygon(record: dict) -> object | None:
@@ -814,7 +980,15 @@ def normalize_key(value: object) -> str:
 
 
 def parcel_join_key(record: dict) -> str:
-    for field in ("PARID", "SCHEDNUM", "PARCEL_ID", "PARCELID", "PARCELNB", "PIN", "SPN", "AIN", "Folio", "parcel_number"):
+    if ACTIVE_COUNTY_NAME.strip().lower() == "denver":
+        schedule = normalize_key(record.get("SCHEDNUM") or record.get("PARID"))
+        if schedule:
+            return schedule
+    for field in (
+        "PARID", "ParcelNo", "PARCELNUMBER", "PARCELNUM", "PARCEL_SPN", "PARCEL_ID",
+        "PARCELID", "PARCELNB", "PARCEL", "PIN", "SPN", "AIN", "Folio", "SCHEDNUM",
+        "parcel_number",
+    ):
         value = normalize_key(record.get(field))
         if value:
             return value
@@ -829,6 +1003,10 @@ def address_from_record(record: dict) -> str:
         or record.get("Situs_Address")
         or record.get("PRPADDRESS")
         or record.get("concataddr1")
+        or record.get("PropertyAddress")
+        or record.get("SITUS_FULL_ADDRESS")
+        or record.get("LOCADDRESS")
+        or record.get("SITUS")
         or ""
     ).strip()
     if direct:
@@ -1090,14 +1268,16 @@ def building_polygon_for_imagery_source(record: dict, source: dict) -> object | 
     return polygon
 
 
-def building_polygon_in_drcog_tile_crs(record: dict) -> object | None:
+def building_polygon_in_drcog_tile_crs(record: dict, source: dict | None = None) -> object | None:
     polygon = build_polygon_from_esri(record.get("building_esri_geometry"), transform_to_parcel=False)
     if polygon is None:
         polygon = build_polygon_from_wkt(record.get("building_geometry") or record.get("building_footprint") or "")
     if polygon is None:
         return None
-    if TRANSFORMER_TO_DRCOG_TILE is not None:
-        polygon = transform(TRANSFORMER_TO_DRCOG_TILE.transform, polygon)
+    target_crs = int((source or {}).get("index_crs") or DRCOG_TILE_INDEX_CRS)
+    if BUILDING_CRS and BUILDING_CRS != target_crs:
+        transformer = Transformer.from_crs(BUILDING_CRS, target_crs, always_xy=True)
+        polygon = transform(transformer.transform, polygon)
     if polygon.is_empty:
         return None
     return polygon
@@ -1109,6 +1289,26 @@ def padded_bounds(bounds: tuple[float, float, float, float], padding_ratio: floa
     height = max(maxy - miny, 20.0)
     pad = max(width, height) * padding_ratio
     return minx - pad, miny - pad, maxx + pad, maxy + pad
+
+
+def enforce_minimum_export_resolution(
+    bounds: tuple[float, float, float, float], source: dict
+) -> tuple[float, float, float, float]:
+    """Keep cached imagery requests at or above the source's finest valid scale."""
+    try:
+        resolution = float(source.get("minimum_export_resolution") or 0)
+        pixels = max(int(part) for part in IMAGE_SIZE.split(","))
+    except (TypeError, ValueError):
+        return bounds
+    minimum_side = resolution * pixels
+    if minimum_side <= 0:
+        return bounds
+    minx, miny, maxx, maxy = bounds
+    side = max(maxx - minx, maxy - miny, minimum_side)
+    center_x = (minx + maxx) / 2
+    center_y = (miny + maxy) / 2
+    half = side / 2
+    return center_x - half, center_y - half, center_x + half, center_y + half
 
 
 def square_buffered_bounds(
@@ -1209,8 +1409,11 @@ def aerial_image_url(source: dict, bounds: tuple[float, float, float, float], po
     return endpoint + "?" + urlencode(params)
 
 
-def raster_source_metadata(source: dict, polygon: object) -> dict[str, str]:
-    metadata = {"photo_date": ""}
+def raster_source_metadata(source: dict, polygon: object) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "photo_date": "",
+        "native_resolution": source.get("native_resolution", ""),
+    }
     metadata_layer = source.get("metadata_layer")
     if metadata_layer is None:
         return metadata
@@ -1261,6 +1464,13 @@ def raster_source_metadata(source: dict, polygon: object) -> dict[str, str]:
     date_text = normalize_esri_date(raw_date)
     if date_text:
         metadata["photo_date"] = date_text
+    raw_resolution = attrs.get(source.get("metadata_resolution_field") or "SRC_RES")
+    try:
+        resolution = float(raw_resolution)
+    except (TypeError, ValueError):
+        resolution = 0.0
+    if resolution > 0:
+        metadata["native_resolution"] = resolution
     return metadata
 
 
@@ -1301,13 +1511,42 @@ def export_raster_crop_url(
     return service_url + endpoint + "?" + urlencode(params)
 
 
+def native_capped_crop_pixels(
+    record: dict,
+    source: dict,
+    bounds: tuple[float, float, float, float],
+    requested_pixels: int,
+) -> int:
+    """Cap an export at configured limits and the source's real pixel size."""
+    pixels = max(1, int(requested_pixels or AI_CROP_PIXELS))
+    if source.get("max_export_pixels"):
+        pixels = min(pixels, int(source["max_export_pixels"]))
+
+    raw_resolution = (
+        record.get(f"{source['key']}_aerial_native_resolution")
+        or source.get("native_resolution")
+    )
+    try:
+        native_resolution = float(raw_resolution)
+    except (TypeError, ValueError):
+        native_resolution = 0.0
+    if native_resolution <= 0:
+        return pixels
+
+    side = max(bounds[2] - bounds[0], bounds[3] - bounds[1])
+    native_pixels = max(1, int(ceil(side / native_resolution)))
+    minimum_pixels = max(1, int(source.get("min_export_pixels") or 1))
+    return min(pixels, max(native_pixels, minimum_pixels))
+
+
 def add_aerial_image_fields(record: dict) -> None:
     for source in IMAGERY_SOURCES:
         if source["kind"] == "DRAPPOriginalTile":
-            polygon = building_polygon_in_drcog_tile_crs(record)
+            polygon = building_polygon_in_drcog_tile_crs(record, source)
             metadata = drapp_original_tile_metadata(source, polygon) if polygon else {"url": "", "photo_date": ""}
             record[f"{source['key']}_aerial_image_url"] = metadata.get("url", "")
-            record[f"{source['key']}_aerial_photo_date"] = metadata.get("photo_date", "")
+            record[f"{source['key']}_aerial_photo_date"] = metadata.get("photo_date") or source.get("photo_date", "")
+            record[f"{source['key']}_aerial_native_resolution"] = source.get("native_resolution", "")
             record.setdefault(f"{source['key']}_aerial_image_file", "")
             continue
 
@@ -1315,12 +1554,16 @@ def add_aerial_image_fields(record: dict) -> None:
         if polygon is None:
             record[f"{source['key']}_aerial_image_url"] = ""
             record[f"{source['key']}_aerial_photo_date"] = ""
+            record[f"{source['key']}_aerial_native_resolution"] = ""
             record[f"{source['key']}_aerial_image_file"] = ""
             continue
-        bounds = padded_bounds(polygon.bounds)
+        bounds = enforce_minimum_export_resolution(padded_bounds(polygon.bounds), source)
         record[f"{source['key']}_aerial_image_url"] = aerial_image_url(source, bounds, polygon)
         metadata = raster_source_metadata(source, polygon)
         record[f"{source['key']}_aerial_photo_date"] = metadata.get("photo_date") or source.get("photo_date", "")
+        record[f"{source['key']}_aerial_native_resolution"] = (
+            metadata.get("native_resolution") or source.get("native_resolution", "")
+        )
         record.setdefault(f"{source['key']}_aerial_image_file", "")
     sync_primary_aerial_fields(record)
 
@@ -1328,11 +1571,23 @@ def add_aerial_image_fields(record: dict) -> None:
 def sync_primary_aerial_fields(record: dict) -> None:
     if not IMAGERY_SOURCES:
         return
-    source = IMAGERY_SOURCES[0]
+    successful_sources = [
+        source
+        for source in IMAGERY_SOURCES
+        if str(record.get(f"{source['key']}_aerial_qa_status") or "").lower() == "ok"
+        and record.get(f"{source['key']}_aerial_image_file")
+    ]
+    available_sources = [
+        source
+        for source in IMAGERY_SOURCES
+        if record.get(f"{source['key']}_aerial_image_url")
+    ]
+    source = (successful_sources or available_sources or IMAGERY_SOURCES)[0]
     key = source["key"]
     record["primary_aerial_source"] = source.get("label") or source.get("name") or key
     record["primary_aerial_image_url"] = record.get(f"{key}_aerial_image_url", "")
     record["primary_aerial_photo_date"] = record.get(f"{key}_aerial_photo_date", "")
+    record["primary_aerial_native_resolution"] = record.get(f"{key}_aerial_native_resolution", "")
     record["primary_aerial_image_file"] = record.get(f"{key}_aerial_image_file", "")
     record["primary_aerial_qa_status"] = record.get(f"{key}_aerial_qa_status", "")
     record["primary_aerial_qa_reason"] = record.get(f"{key}_aerial_qa_reason", "")
@@ -1432,8 +1687,7 @@ def save_ai_crop_image(
         return ""
 
     bounds = square_buffered_bounds(polygon.bounds, buffer_feet, str(source.get("image_units") or "meters"))
-    if source.get("max_export_pixels"):
-        max_pixels = min(int(max_pixels or AI_CROP_PIXELS), int(source["max_export_pixels"]))
+    max_pixels = native_capped_crop_pixels(record, source, bounds, max_pixels)
     source_dir = os.path.join(image_dir, source["key"])
     os.makedirs(source_dir, exist_ok=True)
     base_name = slug(record.get("parcel_number") or record.get("property_address") or record.get("OBJECTID"))
@@ -1459,6 +1713,11 @@ def save_ai_crop_image(
             handle.write(data)
         return output_path
 
+    if source.get("kind") == "DRAPPOriginalTile" and not source.get("crop_tile_service_url"):
+        # Current DRCOG archive entries expose original GeoTIFFs but no public
+        # tiled crop endpoint. Keep them available for original-tile mode and
+        # let another configured imagery source supply the AI crop.
+        return ""
     level = int(source.get("crop_tile_level") or AI_CROP_TILE_LEVEL)
     service_url = str(source.get("crop_tile_service_url") or AI_CROP_TILE_SERVICE_URL)
     col_min, col_max, row_min, row_max, resolution = web_mercator_tile_indices(bounds, level)
@@ -1605,8 +1864,10 @@ def combine_data(buildings: list[dict], parcels: list[dict]) -> list[dict]:
         if building_poly is None:
             skipped += 1
             continue
-        building["projected_building_footprint_area"] = building_poly.area
-        building["projected_roof_area"] = building_poly.area
+        stored_footprint_sqft = numeric_value(building.get("footprint_sqft"))
+        area_sqft = stored_footprint_sqft if stored_footprint_sqft and stored_footprint_sqft > 0 else building_poly.area
+        building["projected_building_footprint_area"] = area_sqft
+        building["projected_roof_area"] = area_sqft
 
         parcel = None
         if parcel_index is not None:
@@ -2049,7 +2310,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    global DENVER_BUILDINGS_URL, PARCELS_URL, IMAGERY_SOURCES, _COLLECT_PARCEL_FIELDS, _COLLECT_BUILDING_FIELDS, ACTIVE_COUNTY_NAME, ACTIVE_STATE
+    global DENVER_BUILDINGS_URL, PARCELS_URL, IMAGERY_SOURCES, _COLLECT_PARCEL_FIELDS, _COLLECT_BUILDING_FIELDS, ACTIVE_COUNTY_NAME, ACTIVE_STATE, BUILDING_SOURCE_KIND
     args = parse_args()
     profile = county_profile(args.county)
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2057,6 +2318,7 @@ def main() -> int:
     DENVER_BUILDINGS_URL = profile.building_url
     PARCELS_URL = profile.parcel_url
     IMAGERY_SOURCES = list(profile.imagery_sources)
+    BUILDING_SOURCE_KIND = profile.building_source
     ACTIVE_COUNTY_NAME = profile.display_name.replace(" County", "")
     ACTIVE_STATE = (args.state or "CO").strip().upper()
     _COLLECT_PARCEL_FIELDS = None
@@ -2079,7 +2341,7 @@ def main() -> int:
             print("-", label)
         return 0
 
-    init_crs_transformers(DENVER_BUILDINGS_URL, PARCELS_URL)
+    init_crs_transformers(DENVER_BUILDINGS_URL, PARCELS_URL, profile.building_crs)
 
     if zip_codes:
         print(f"Filtering parcel and assessor data to ZIP codes: {', '.join(sorted(zip_codes))}")
