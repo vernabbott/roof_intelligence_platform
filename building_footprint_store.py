@@ -350,13 +350,38 @@ def save_canonical_footprint(
                     ON CONFLICT (canonical_key) DO UPDATE SET
                         parcel_id = EXCLUDED.parcel_id,
                         requested_address = COALESCE(EXCLUDED.requested_address, {CANONICAL_TABLE}.requested_address),
-                        resolution_status = EXCLUDED.resolution_status,
-                        selected_source_footprint_id = EXCLUDED.selected_source_footprint_id,
-                        selected_source = EXCLUDED.selected_source, source_count = EXCLUDED.source_count,
-                        difference_pct = EXCLUDED.difference_pct, confidence = EXCLUDED.confidence,
-                        validation_details = EXCLUDED.validation_details,
-                        validated_at = EXCLUDED.validated_at, resolved_at = EXCLUDED.resolved_at,
-                        resolved_by = EXCLUDED.resolved_by, resolution_reason = EXCLUDED.resolution_reason,
+                        resolution_status = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.resolution_status ELSE EXCLUDED.resolution_status END,
+                        selected_source_footprint_id = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.selected_source_footprint_id
+                            ELSE EXCLUDED.selected_source_footprint_id END,
+                        selected_source = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.selected_source ELSE EXCLUDED.selected_source END,
+                        source_count = EXCLUDED.source_count,
+                        difference_pct = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.difference_pct ELSE EXCLUDED.difference_pct END,
+                        confidence = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.confidence ELSE EXCLUDED.confidence END,
+                        validation_details = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.validation_details ELSE EXCLUDED.validation_details END,
+                        validated_at = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.validated_at ELSE EXCLUDED.validated_at END,
+                        resolved_at = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.resolved_at ELSE EXCLUDED.resolved_at END,
+                        resolved_by = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.resolved_by ELSE EXCLUDED.resolved_by END,
+                        resolution_reason = CASE
+                            WHEN {CANONICAL_TABLE}.resolution_status = 'manually_resolved'
+                            THEN {CANONICAL_TABLE}.resolution_reason ELSE EXCLUDED.resolution_reason END,
                         updated_at = NOW()
                     RETURNING id
                     """

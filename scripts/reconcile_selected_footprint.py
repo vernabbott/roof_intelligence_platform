@@ -13,7 +13,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_PCS_DIR = PROJECT_DIR.parent / "PCS Proposal Management"
 sys.path.insert(0, str(PROJECT_DIR))
 
-import collect_denver_buildings_with_parcels as collector
+import collect_county_buildings_with_parcels as collector
 from assessor_detail import fetch_assessor_details, validate_assessor_footprint
 from building_footprint_store import (
     MICROSOFT_SOURCE,

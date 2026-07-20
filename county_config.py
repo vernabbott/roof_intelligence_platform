@@ -12,10 +12,10 @@ class CountyProfile:
     display_name: str
     building_url: str
     parcel_url: str
-    default_zip_codes: str
     imagery_sources: tuple[dict, ...]
     building_source: str = "arcgis"
     building_crs: int | None = None
+    parcel_id_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -500,17 +500,16 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Denver",
         building_url=DENVER_BUILDINGS_URL,
         parcel_url=DENVER_PARCELS_URL,
-        default_zip_codes="80121,80122",
         imagery_sources=DENVER_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
+        parcel_id_fields=("SCHEDNUM", "PARID"),
     ),
     "arapahoe": CountyProfile(
         key="arapahoe",
         display_name="Arapahoe County",
         building_url=ARAPAHOE_BUILDINGS_URL,
         parcel_url=ARAPAHOE_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=ARAPAHOE_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -520,7 +519,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Jefferson County",
         building_url=JEFFERSON_BUILDINGS_URL,
         parcel_url=JEFFERSON_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=JEFFERSON_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -530,7 +528,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Adams County",
         building_url=ADAMS_BUILDINGS_URL,
         parcel_url=ADAMS_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=ADAMS_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -540,7 +537,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Boulder County",
         building_url="",
         parcel_url=BOULDER_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=WORLD_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -550,7 +546,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Broomfield County",
         building_url="",
         parcel_url=BROOMFIELD_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=WORLD_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -560,7 +555,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Clear Creek County",
         building_url="",
         parcel_url=CLEAR_CREEK_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=WORLD_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -570,7 +564,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Douglas County",
         building_url="",
         parcel_url=DOUGLAS_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=WORLD_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -580,7 +573,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Larimer County",
         building_url="",
         parcel_url=LARIMER_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=LARIMER_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -590,7 +582,6 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
         display_name="Weld County",
         building_url="",
         parcel_url=WELD_PARCELS_URL,
-        default_zip_codes="",
         imagery_sources=WORLD_IMAGERY_SOURCES,
         building_source="postgis",
         building_crs=4326,
@@ -599,7 +590,7 @@ COUNTY_PROFILES: dict[str, CountyProfile] = {
 
 
 def county_profile(key: str) -> CountyProfile:
-    normalized = (key or "denver").strip().lower()
+    normalized = (key or "").strip().lower()
     try:
         return COUNTY_PROFILES[normalized]
     except KeyError as exc:

@@ -7,9 +7,9 @@ the selected raw row and records the reconciliation status.
 
 Statuses:
 
-- `validated`: independent sources differ by no more than 5%.
+- `validated`: the county footprint is no more than 5% larger than Microsoft; exactly 5% is accepted, and a larger Microsoft footprint remains preferred.
 - `single_source`: only one suitable footprint is available.
-- `pending_review`: sources differ by more than 5%.
+- `pending_review`: the county footprint is more than 5% larger than Microsoft.
 - `manually_resolved`: a reviewer selected the authoritative source and gave a reason.
 
 The canonical table references raw geometry instead of copying it. Source
@@ -44,7 +44,7 @@ List or resolve the review queue:
 ```
 
 PCS exposes the same pending queue on the Roof Intelligence workspace.
-Resolved decisions are reused by single-address, map, standalone, and bulk
+Resolved decisions are reused by single-address, rectangle, and radius
 report paths. Report-time comparison remains a safety net for properties that
 have not yet been reconciled or whose source data changed.
 
@@ -52,6 +52,10 @@ Automatic canonical selections backed by Microsoft footprints are compared
 with the bounded county source again when a linked raw source changes or when
 the canonical decision is more than 30 days old. Manual county selections are
 not silently replaced by this automatic refresh.
+
+Revalidation is property-scoped through the normal PilotPoint workflow. There
+is no blanket canonical-status update; existing manual resolutions are
+preserved by canonical upserts.
 
 Official county sources are cached only for selected or reconciled properties.
 The four available layers contain roughly 1.34 million rows, so a full duplicate

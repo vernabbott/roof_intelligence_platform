@@ -162,7 +162,7 @@ def main() -> int:
     args = parser.parse_args()
 
     sys.path[:0] = [str(PROJECT_DIR), str(args.pcs_dir.expanduser().resolve())]
-    import collect_denver_buildings_with_parcels as collector
+    import collect_county_buildings_with_parcels as collector
     import roof_intelligence_single_address as single
     from assessor_detail import fetch_assessor_details
     from county_config import COUNTY_PROFILES

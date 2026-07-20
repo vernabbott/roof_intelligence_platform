@@ -4,10 +4,8 @@
 
 from __future__ import annotations
 
-import argparse
 import base64
 import copy
-import csv
 import hashlib
 import json
 import os
@@ -22,14 +20,6 @@ from urllib.request import Request, urlopen
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
 
-from assessor_detail import normalize_identifier, validate_assessor_footprint
-from pcs_request_workflow import (
-    apply_assessor_result_to_row,
-    fetch_request_assessor_details,
-    filter_selected_rows,
-    parse_pcs_request,
-)
-
 from roof_replacement_cost_estimator import (
     CostConfidenceInputs,
     cost_estimation_disclaimer,
@@ -38,7 +28,6 @@ from roof_replacement_cost_estimator import (
 )
 from report_summary_config import REPORT_SUMMARY_CONFIG, append_with_limit
 from roof_information_config import ROOF_INFORMATION_CONFIG, roof_system_card_text
-from report_footprint_validation import validate_report_row_footprints
 from roof_reference_config import (
     LoadedRoofReference,
     RoofReferenceConfig,
@@ -2074,12 +2063,6 @@ def render_report(row: dict, analysis: dict, denver_path: Path | None, drcog_pat
     canvas.save(output_path, "PDF", resolution=200.0)
 
 
-def read_rows(csv_path: Path) -> list[dict]:
-    csv.field_size_limit(1024 * 1024 * 1024)
-    with csv_path.open(newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle))
-
-
 def safe_path_part(value: object, fallback: str) -> str:
     text = normalize_text(value)
     cleaned = "".join(ch if ch.isalnum() or ch in ("-", "_", " ") else "-" for ch in text).strip()
@@ -2112,15 +2095,6 @@ def row_county_name(row: dict) -> str:
     explicit = normalize_text(row.get("County"))
     if explicit:
         return safe_path_part(explicit.replace(" County", ""), "Unknown-County")
-
-    source = aerial_source_label(row).lower()
-    city = normalize_text(row.get("Building City")).lower()
-    if "arapahoe" in source:
-        return "Arapahoe"
-    if "jefferson" in source:
-        return "Jefferson"
-    if city == "denver":
-        return "Denver"
     return "Unknown-County"
 
 
@@ -2264,320 +2238,17 @@ def existing_analysis_source(row: dict, json_dirs: tuple[Path, ...], provider: s
     return normalize_text(data.get("source")).lower()
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate one-page roof intelligence PDF reports.")
-    parser.add_argument(
-        "--input",
-        default="data/CO/Denver/parcels/denver_buildings_with_parcels_80223_with_aerial.csv",
-        help="Building with parcel CSV",
-    )
-    parser.add_argument("--output-dir", default=".", help="Root directory for State/ZIP organized report output")
-    parser.add_argument("--analysis-cache-dir", default=None, help="Deprecated; JSON now writes under each State/ZIP/json folder")
-    parser.add_argument("--state", default=None, help="Validate rows against this state code")
-    parser.add_argument("--county", default=None, help="Validate rows against this county name")
-    parser.add_argument("--zip-code", default=None, help="Validate rows against this ZIP code")
-    parser.add_argument("--limit", type=int, default=None, help="Maximum reports to generate")
-    parser.add_argument("--start", type=int, default=0, help="Zero-based row offset")
-    parser.add_argument("--use-ai", action="store_true", help="Call AI vision analysis when the selected provider API key is available")
-    parser.add_argument("--ai-provider", choices=("openai", "gemini"), default="openai", help="AI provider for roof image analysis")
-    parser.add_argument("--ai-model", default=None, help="Provider model for image analysis; defaults by provider")
-    parser.add_argument(
-        "--roof-reference-classification",
-        action="store_true",
-        help="Replace legacy one-call roof analysis with the feature-flagged two-stage reference workflow",
-    )
-    parser.add_argument("--allow-ai-fallback", action="store_true", help="Generate fallback reports if the selected AI provider fails")
-    parser.add_argument("--skip-existing-reports", action="store_true", help="Skip rows whose target PDF already exists")
-    parser.add_argument("--only-missing", action="store_true", help="Alias for --skip-existing-reports")
-    parser.add_argument("--retry-failed-ai", action="store_true", help="With --use-ai, rerun rows whose existing analysis is fallback")
-    parser.add_argument("--force", action="store_true", help="Replace existing output files; this is the default behavior")
-    parser.add_argument("--cleanup-stale-only", action="store_true", help="Only remove stale parcel-scoped duplicate files; do not regenerate reports")
-    parser.add_argument("--manifest", default=None, help="Write a JSON run manifest to this path")
-    parser.add_argument(
-        "--pcs-request",
-        default=None,
-        help="PCS single-address/map-selection JSON; only listed parcels are eligible for reports",
-    )
-    parser.add_argument(
-        "--skip-live-footprint-validation",
-        action="store_true",
-        help="Emergency/offline bypass for live Supabase/county geometry validation",
-    )
-    return parser.parse_args()
-
-
 def default_ai_model(provider: str) -> str:
     if provider == "gemini":
         return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
     return os.environ.get("OPENAI_VISION_MODEL", "gpt-5.4-mini")
 
 
-def main() -> int:
-    base_dir = Path.cwd()
-    script_dir = Path(__file__).resolve().parent
-    load_env_file(script_dir / ".env")
-    if base_dir != script_dir:
-        load_env_file(base_dir / ".env")
-
-    args = parse_args()
-    input_path = Path(args.input)
-    if not input_path.is_absolute():
-        input_path = base_dir / input_path
-    rows = read_rows(input_path)
-    pcs_request = None
-    assessor_results = {}
-    if args.pcs_request:
-        pcs_request_path = Path(args.pcs_request)
-        if not pcs_request_path.is_absolute():
-            pcs_request_path = base_dir / pcs_request_path
-        with pcs_request_path.open(encoding="utf-8") as handle:
-            pcs_request = parse_pcs_request(json.load(handle))
-        rows = filter_selected_rows(rows, pcs_request)
-        matched = {
-            (
-                normalize_text(row.get("County")).lower().replace(" county", "").replace(" ", "_"),
-                normalize_identifier(row.get("Parcel Number")),
-            )
-            for row in rows
-        }
-        missing = [
-            f"{item.county}:{item.parcel_id}"
-            for item in pcs_request.properties
-            if (item.county, normalize_identifier(item.parcel_id)) not in matched
-        ]
-        if missing:
-            raise RuntimeError(
-                "PCS selected parcel(s) were not found in the report input: " + ", ".join(missing)
-            )
-        assessor_results = fetch_request_assessor_details(pcs_request)
-    selected_rows = rows[args.start :]
-    if args.limit is not None:
-        selected_rows = selected_rows[: args.limit]
-
-    requested_state = normalize_text(args.state).upper()
-    requested_county = requested_county_name(args.county)
-    requested_zip = "".join(ch for ch in normalize_text(args.zip_code) if ch.isdigit())[:5]
-
-    output_dir = Path(args.output_dir)
-    if not output_dir.is_absolute():
-        output_dir = base_dir / output_dir
-    ai_model = args.ai_model or default_ai_model(args.ai_provider)
-    use_roof_reference_classification = roof_reference_feature_enabled(args.roof_reference_classification)
-    if args.use_ai:
-        api_key_name = "GEMINI_API_KEY" if args.ai_provider == "gemini" else "OPENAI_API_KEY"
-        if not os.environ.get(api_key_name):
-            raise RuntimeError(f"--use-ai requested, but {api_key_name} is not set")
-        if use_roof_reference_classification:
-            load_roof_reference_config()
-
-    manifest = {
-        "input": str(input_path),
-        "output_dir": str(output_dir),
-        "state": requested_state,
-        "county": requested_county,
-        "zip_code": requested_zip,
-        "pcs_request": {
-            "enabled": pcs_request is not None,
-            "request_id": pcs_request.request_id if pcs_request else "",
-            "selection_type": pcs_request.selection_type if pcs_request else "",
-            "selected_parcels": len(pcs_request.properties) if pcs_request else 0,
-        },
-        "live_footprint_validation": not args.skip_live_footprint_validation,
-        "started_at": datetime.now().isoformat(timespec="seconds"),
-        "ai": {
-            "requested": bool(args.use_ai),
-            "provider": args.ai_provider,
-            "model": ai_model,
-            "allow_fallback": bool(args.allow_ai_fallback),
-            "roof_reference_classification": bool(use_roof_reference_classification),
-        },
-        "counts": {
-            "rows_selected": len(selected_rows),
-            "generated": 0,
-            "skipped_existing": 0,
-            "preflight_failed": 0,
-            "failed": 0,
-            "ai": 0,
-            "fallback": 0,
-            "blank_or_missing_images": 0,
-            "stale_files_removed": 0,
-            "cleanup_only": 0,
-        },
-        "records": [],
-    }
-
-    for index, row in enumerate(selected_rows, start=args.start + 1):
-        apply_requested_scope_defaults(row, requested_state, requested_county, requested_zip)
-        if not normalize_text(row.get("County")):
-            inferred_county = row_county_name(row)
-            if inferred_county != "Unknown-County":
-                row["County"] = inferred_county
-        parcel = normalize_text(row.get("Parcel Number")) or f"row-{index}"
-        assessor_result = None
-        if pcs_request is not None:
-            county_key = normalize_text(row.get("County")).lower().replace(" county", "").replace(" ", "_")
-            assessor_result = assessor_results.get((county_key, normalize_identifier(parcel)))
-            if assessor_result is None:
-                raise RuntimeError(f"No assessor lookup result exists for selected parcel {parcel}")
-            apply_assessor_result_to_row(row, assessor_result)
-            footprint_validation = validate_assessor_footprint(
-                row.get("Building Footprint Sq Ft"), assessor_result.records
-            )
-            if footprint_validation.get("status") == "discrepancy":
-                raise RuntimeError(
-                    "Building footprint discrepancy needs attention for parcel "
-                    f"{parcel}: report footprint {footprint_validation['primary_sqft']:.0f} sq ft "
-                    f"versus explicit assessor footprint {footprint_validation['assessor_sqft']:.0f} sq ft "
-                    f"({footprint_validation['difference_pct']:.2f}% difference; 5% allowed)."
-                )
-            if footprint_validation.get("status") == "not_comparable":
-                warning = footprint_validation["reason"]
-                if warning not in assessor_result.warnings:
-                    assessor_result.warnings.append(warning)
-        denver_path = resolve_path(base_dir, aerial_image_file_value(row))
-        drcog_path = None
-        dirs = row_output_dirs(output_dir, row)
-        data_dirs = row_data_dirs(output_dir, row)
-        output_path = dirs["reports"] / f"{safe_report_stem(row, f'row-{index}')}.pdf"
-        record_status = {
-            "row": index,
-            "parcel": parcel,
-            "address": normalize_text(row.get("Address")),
-            "state": safe_path_part(row.get("Building State"), "Unknown-State").upper(),
-            "county": row_county_name(row),
-            "zip_code": row_zip_code(row),
-            "report": str(output_path),
-            "status": "pending",
-            "problems": [],
-        }
-        if assessor_result is not None:
-            record_status["assessor"] = {
-                "record_count": len(assessor_result.records),
-                "source_counts": assessor_result.source_counts,
-                "detail_links": assessor_result.detail_links,
-                "warnings": assessor_result.warnings,
-            }
-
-        if not args.skip_live_footprint_validation and not args.cleanup_stale_only:
-            try:
-                record_status["footprint_validation"] = validate_report_row_footprints(row)
-            except Exception as exc:
-                record_status["status"] = "preflight_failed"
-                record_status["problems"].append(str(exc))
-                manifest["counts"]["preflight_failed"] += 1
-                manifest["records"].append(record_status)
-                print(f"Skipping {parcel}: {exc}")
-                continue
-
-        matches_scope, scope_problems = row_matches_requested_scope(row, requested_state, requested_county, requested_zip)
-        if not matches_scope:
-            record_status["status"] = "preflight_failed"
-            record_status["problems"] = scope_problems
-            manifest["counts"]["preflight_failed"] += 1
-            manifest["records"].append(record_status)
-            print(f"Skipping {parcel}: {'; '.join(scope_problems)}")
-            continue
-
-        should_skip_existing = (args.skip_existing_reports or args.only_missing) and output_path.exists() and not args.force
-        if should_skip_existing and args.retry_failed_ai and args.use_ai:
-            prior_analysis = existing_analysis_record(row, (data_dirs["json"], dirs["json"]), args.ai_provider)
-            prior_source = normalize_text(prior_analysis.get("source")).lower()
-            if use_roof_reference_classification:
-                reference_status = normalize_text((prior_analysis.get("reference_workflow") or {}).get("status")).lower()
-                should_skip_existing = prior_source in {"openai", "gemini"} and reference_status == "completed"
-                record_status["prior_reference_workflow_status"] = reference_status
-            else:
-                should_skip_existing = prior_source in {"openai", "gemini"}
-            record_status["prior_analysis_source"] = prior_source
-
-        if should_skip_existing:
-            record_status["status"] = "skipped_existing"
-            manifest["counts"]["skipped_existing"] += 1
-            manifest["records"].append(record_status)
-            print(f"Skipping existing {output_path}")
-            continue
-
-        image_info = image_diagnostics(denver_path)
-        record_status["image"] = image_info
-        if image_info["blank"]:
-            manifest["counts"]["blank_or_missing_images"] += 1
-            problem = f"aerial image {image_info['reason']}"
-            record_status["problems"].append(problem)
-            if args.use_ai and not args.allow_ai_fallback:
-                record_status["status"] = "preflight_failed"
-                manifest["counts"]["preflight_failed"] += 1
-                manifest["records"].append(record_status)
-                print(f"Skipping {parcel}: {problem}")
-                continue
-
-        if args.cleanup_stale_only:
-            data_denver_path = organize_aerial_image(denver_path, data_dirs["aerial"], row, f"row-{index}") or denver_path
-            organized_denver_path = organize_aerial_image(data_denver_path, dirs["aerial"], row, f"row-{index}")
-            removed_stale = cleanup_stale_outputs(dirs, data_dirs, row, output_path, organized_denver_path, data_denver_path)
-            record_status["status"] = "cleanup_only"
-            if removed_stale:
-                record_status["stale_files_removed"] = removed_stale
-                manifest["counts"]["stale_files_removed"] += len(removed_stale)
-            manifest["counts"]["cleanup_only"] += 1
-            manifest["records"].append(record_status)
-            continue
-
-        try:
-            data_denver_path = organize_aerial_image(denver_path, data_dirs["aerial"], row, f"row-{index}") or denver_path
-            organized_denver_path = organize_aerial_image(data_denver_path, dirs["aerial"], row, f"row-{index}")
-            denver_path = organized_denver_path or denver_path
-            removed_stale = cleanup_stale_outputs(dirs, data_dirs, row, output_path, organized_denver_path, data_denver_path)
-            if removed_stale:
-                record_status["stale_files_removed"] = removed_stale
-                manifest["counts"]["stale_files_removed"] += len(removed_stale)
-            analysis = load_or_create_analysis(
-                row,
-                denver_path,
-                drcog_path,
-                data_dirs["json"],
-                args.use_ai and not image_info["blank"],
-                args.ai_provider,
-                ai_model,
-                args.allow_ai_fallback,
-                use_roof_reference_classification,
-            )
-            analysis = apply_visual_risk_adjustment(analysis)
-            analysis = apply_aerial_age_adjustment(row, analysis)
-            write_analysis_json(row, analysis, (data_dirs["json"], dirs["json"]), args.use_ai, args.ai_provider)
-            render_report(row, analysis, denver_path, drcog_path, output_path)
-            source = normalize_text(analysis.get("source")).lower()
-            record_status["status"] = "generated"
-            record_status["analysis_source"] = source or "unknown"
-            record_status["report"] = str(output_path)
-            manifest["counts"]["generated"] += 1
-            if source in {"openai", "gemini"}:
-                manifest["counts"]["ai"] += 1
-            else:
-                manifest["counts"]["fallback"] += 1
-            manifest["records"].append(record_status)
-            print(f"Wrote {output_path}")
-            time.sleep(0.1)
-        except Exception as exc:
-            record_status["status"] = "failed"
-            record_status["problems"].append(str(exc))
-            manifest["counts"]["failed"] += 1
-            manifest["records"].append(record_status)
-            print(f"Failed {parcel}: {exc}")
-            if not args.allow_ai_fallback:
-                raise
-    manifest["finished_at"] = datetime.now().isoformat(timespec="seconds")
-    if args.manifest:
-        manifest_path = Path(args.manifest)
-        if not manifest_path.is_absolute():
-            manifest_path = base_dir / manifest_path
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        print(f"Wrote manifest {manifest_path}")
-    print(f"Generated {manifest['counts']['generated']} report(s)")
-    return 0
-
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(
+        "The standalone CSV report workflow is retired. "
+        "Order reports through PCS single-address, rectangle, or radius selection."
+    )
 
 # © PilotPoint IQ Roof Intelligence All rights reserved

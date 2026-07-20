@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 import building_footprint_store
-import collect_denver_buildings_with_parcels as collector
+import collect_county_buildings_with_parcels as collector
 from county_config import COUNTY_PROFILES
 
 
@@ -37,6 +37,42 @@ class CountyDiscoveryProfileTests(unittest.TestCase):
 
 
 class BuildingFootprintStoreTests(unittest.TestCase):
+    @staticmethod
+    def canonical_source(source_id=11):
+        return {
+            "id": source_id,
+            "source": building_footprint_store.MICROSOFT_SOURCE,
+            "building_geometry": (
+                "POLYGON ((-105 40, -104.9999 40, -104.9999 40.0001, "
+                "-105 40.0001, -105 40))"
+            ),
+            "footprint_sqft": 1000,
+        }
+
+    def save_with_mock_database(self, validation, **kwargs):
+        connection = MagicMock()
+        connection.execute.return_value.scalar_one.return_value = 99
+        context = MagicMock()
+        context.__enter__.return_value = connection
+        fake_engine = MagicMock()
+        fake_engine.begin.return_value = context
+        expected = {"canonical_id": 99, "canonical_status": "test"}
+        with (
+            patch.object(building_footprint_store, "engine", return_value=fake_engine),
+            patch.object(building_footprint_store, "canonical_schema_available", return_value=True),
+            patch.object(building_footprint_store, "_upsert_secondary_source", return_value=22),
+            patch.object(building_footprint_store, "collect_canonical_by_id", return_value=expected),
+        ):
+            result = building_footprint_store.save_canonical_footprint(
+                "Denver",
+                "123",
+                self.canonical_source(),
+                {**self.canonical_source(22), "source": "Denver county GIS"},
+                validation,
+                **kwargs,
+            )
+        return result, connection
+
     def test_only_automatic_microsoft_canonical_records_are_revalidated(self):
         base = {
             "canonical_status": "validated",
@@ -53,6 +89,44 @@ class BuildingFootprintStoreTests(unittest.TestCase):
                 {**base, "canonical_status": "manually_resolved", "canonical_sources_changed": True}
             )
         )
+
+    def test_directional_discrepancy_creates_pending_review(self):
+        validation = {
+            "status": "discrepancy",
+            "difference_pct": 5.1,
+            "county_excess_pct": 5.1,
+            "comparison_rule": "county_exceeds_microsoft",
+        }
+
+        _, connection = self.save_with_mock_database(validation)
+
+        insert_params = connection.execute.call_args_list[0].args[1]
+        self.assertEqual(insert_params["status"], "pending_review")
+        self.assertEqual(insert_params["selected_id"], 11)
+
+    def test_explicit_resolution_creates_manual_status(self):
+        validation = {"status": "discrepancy", "difference_pct": 10.0}
+
+        _, connection = self.save_with_mock_database(
+            validation,
+            selected_source="microsoft",
+            reason="Reviewed against current imagery",
+            resolved_by="PCS local user",
+        )
+
+        insert_params = connection.execute.call_args_list[0].args[1]
+        self.assertEqual(insert_params["status"], "manually_resolved")
+        self.assertEqual(insert_params["resolved_by"], "PCS local user")
+
+    def test_automatic_upsert_preserves_existing_manual_resolution(self):
+        _, connection = self.save_with_mock_database(
+            {"status": "validated", "difference_pct": 2.0}
+        )
+
+        upsert_sql = str(connection.execute.call_args_list[0].args[0])
+        self.assertIn("resolution_status = 'manually_resolved'", upsert_sql)
+        self.assertIn("THEN canonical_building_footprints.selected_source_footprint_id", upsert_sql)
+        self.assertIn("THEN canonical_building_footprints.resolution_reason", upsert_sql)
 
     def test_parse_envelope_rejects_unbounded_or_reversed_input(self):
         with self.assertRaisesRegex(ValueError, "four-number"):
@@ -98,7 +172,7 @@ class BuildingFootprintStoreTests(unittest.TestCase):
     def test_canonical_schema_references_selected_raw_geometry(self):
         migration = (
             Path(__file__).resolve().parents[1]
-            / "docs/ai/supabase/canonical_building_footprints.sql"
+            / "supabase/migrations/20260719000300_create_canonical_building_footprints.sql"
         ).read_text(encoding="utf-8")
 
         canonical_definition = migration.split("CREATE TABLE IF NOT EXISTS canonical_building_footprints", 1)[1].split(");", 1)[0]
@@ -169,11 +243,14 @@ class CrossCountyGeometryTests(unittest.TestCase):
             "parcel_geometry": "POLYGON ((-1 -1, 2 -1, 2 2, -1 2, -1 -1))",
         }
         original_to_parcel = collector.TRANSFORMER_TO_PARCEL
+        original_county = collector.ACTIVE_COUNTY_NAME
         try:
             collector.TRANSFORMER_TO_PARCEL = None
+            collector.ACTIVE_COUNTY_NAME = "Larimer"
             records = collector.combine_data([building], [parcel])
         finally:
             collector.TRANSFORMER_TO_PARCEL = original_to_parcel
+            collector.ACTIVE_COUNTY_NAME = original_county
 
         self.assertEqual(records[0]["building_footprint_sqft"], 44570)
         self.assertEqual(records[0]["parcel_number"], "TESTPARCEL")

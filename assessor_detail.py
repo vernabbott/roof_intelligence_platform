@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from county_config import AssessorSource, assessor_sources
+from footprint_comparison import compare_microsoft_to_county
 
 
 REQUEST_TIMEOUT_SECONDS = 60
@@ -315,14 +316,12 @@ def validate_assessor_footprint(
         }
 
     field_name, assessor_area = candidates[0]
-    difference = abs(primary_area - assessor_area) / max(primary_area, 1.0)
+    comparison = compare_microsoft_to_county(primary_area, assessor_area, tolerance)
     return {
-        "status": "validated" if difference <= tolerance else "discrepancy",
+        **comparison,
         "field": field_name,
         "primary_sqft": round(primary_area, 1),
         "assessor_sqft": round(assessor_area, 1),
-        "difference_pct": round(difference * 100, 2),
-        "tolerance_pct": round(tolerance * 100, 2),
     }
 
 

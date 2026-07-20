@@ -8,19 +8,7 @@ status: implemented
 
 Implemented behind an opt-in feature flag. The legacy one-call AI workflow remains the default when the flag is off.
 
-Enable it for a direct report run:
-
-```text
-python3 generate_roof_intelligence_reports.py --use-ai --roof-reference-classification [other arguments]
-```
-
-Enable it for a ZIP workflow:
-
-```text
-python3 run_zip.py --use-ai --roof-reference-classification [other arguments]
-```
-
-It may also be enabled through `.env` or the process environment:
+Enable it for the PCS report worker through `.env` or the process environment:
 
 ```text
 ROOF_REFERENCE_CLASSIFICATION=1

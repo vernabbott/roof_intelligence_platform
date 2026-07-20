@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 from unittest.mock import patch
 
-import collect_denver_buildings_with_parcels as collector
+import collect_county_buildings_with_parcels as collector
 from county_config import ADAMS_IMAGERY_SOURCES, DENVER_IMAGERY_SOURCES, JEFFERSON_IMAGERY_SOURCES
 from generate_roof_intelligence_reports import aerial_photo_age_years
 
