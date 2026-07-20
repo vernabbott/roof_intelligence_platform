@@ -24,6 +24,7 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 - `epdm_or_mod_bit` — controlled final-stage ambiguity when a dark membrane cannot be separated between EPDM and modified bitumen
 - `mod_bit_or_coating` — controlled final-stage ambiguity when a weathered asphaltic roof cannot be separated between modified bitumen and coating
 - `mod_bit_or_tar_and_gravel` — controlled final-stage ambiguity when an asphaltic or aggregate-looking roof cannot be separated between modified bitumen and tar-and-gravel/BUR
+- `ballasted_or_tar_and_gravel` — controlled final-stage ambiguity when a tan aggregate-covered roof cannot be separated between a ballasted membrane and tar-and-gravel/BUR
 - `unknown` — evidence is insufficient to establish a material family
 
 ## Classification Workflow
@@ -31,8 +32,8 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 1. Confirm the visible surface is part of the target building roof.
 2. Divide the roof into contiguous zones using parapets, ridges, expansion joints, elevation changes, additions, and material transitions.
    Do not create roof-material zones for parapet coping, edge trim, curbs, equipment housings, mechanical screens, or other rooftop components that are not roof fields.
-3. Evaluate each zone independently for surface texture, color, reflectivity, seam or panel geometry, edge details, flashings, aggregate, and penetrations.
-4. Return as many as three evidence-supported candidates per zone. Do not include unsupported possibilities merely because they are common.
+3. Before naming a material, record the zone's color family, seam pattern, surface texture, perimeter-stone transition, and raised-ridge pattern. Use `uncertain` when the image does not resolve a cue; do not convert an unresolved cue into an observed absence.
+4. Apply the fundamental material priors below to those observations, then return as many as three evidence-supported candidates per zone. Do not include unsupported possibilities merely because they are common.
 5. Return only a supported canonical type key. For an unresolved white membrane or reflective roof, use `tpo` as the conservative default and preserve PVC or coating as alternatives.
 6. Assign confidence to each candidate based on visible evidence, resolution, angle, obstruction, lighting, and remaining alternatives.
 7. Treat estimated area percentages as approximate. Use `0` when the visible share cannot be estimated responsibly.
@@ -58,6 +59,16 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 | Tar and gravel/BUR | Fine embedded-looking aggregate, uniform field, no exposed sheet-lap grid | Can be indistinguishable from a loose-ballasted membrane roof |
 | Coating | Roller or spray variation, old seams and repairs showing through, one finish spanning different substrates | New coating can resemble a new single-ply membrane |
 
+## Fundamental Material Priors
+
+Use these as ordered starting probabilities, not absolute rules. Geometry, texture, seams, edge construction, and image quality can strengthen or override color.
+
+- **White:** favor TPO. PVC is a less likely alternative and should lead only with PVC-specific evidence. If a smooth white roof remains visually unresolved among TPO, PVC, and coating, use the established TPO default at reduced confidence.
+- **Gray:** first compare weathered TPO with modified bitumen. Broad, regular sheet seams on a smooth field favor weathered TPO. A gray asphaltic or granular field without a resolved membrane-sheet layout favors modified bitumen. If the image is too soft to reveal seams, mark the seam pattern `uncertain`; do not treat it as proof that seams are absent.
+- **Black:** strongly favor EPDM when the field is smooth, matte, and membrane-like. Frequent narrow roll laps, granules, or asphaltic texture favor modified bitumen instead. Use `epdm_or_mod_bit` when those distinguishing details are unresolved.
+- **Tan aggregate:** compare ballasted with tar-and-gravel/BUR. A deliberate perimeter band with distinctly larger or differently colored stone strongly favors ballasted. A more uniform fine embedded-looking aggregate field favors tar-and-gravel/BUR. When the perimeter transition, stone size, or embedment is not apparent at the available resolution, use `ballasted_or_tar_and_gravel` rather than forcing either type.
+- **Long parallel raised ridges:** strongly favor metal when the ridges run consistently in one direction and are supported by rigid planes, repeated shadows, or crisp metal edge construction. Low-profile membrane seams without those rigid cues do not establish metal.
+
 ## Required Ambiguity Rules
 
 - Use `tpo` when a white or light-colored membrane-like roof cannot be reliably separated among TPO, PVC, and coating from the available imagery. Lower confidence and retain `pvc` and/or `coating` as alternatives.
@@ -68,7 +79,7 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 - Use `epdm_or_mod_bit`, displayed as **EPDM or Modified Bitumen**, when a dark membrane is established but width, seams, and texture do not support choosing between those two systems.
 - Use `mod_bit_or_coating`, displayed as **Modified Bitumen or Coated Roof**, when a weathered asphaltic-looking surface is established but coating-specific evidence and roll-lap details remain unresolved.
 - Use `mod_bit_or_tar_and_gravel`, displayed as **Modified Bitumen or Tar and Gravel**, when the image suggests an asphaltic or aggregate surface but cannot resolve roll laps, stone embedment, or loose ballast well enough to choose one.
-- Use `aggregate-surfaced low-slope roof (BUR vs ballasted membrane indeterminate)` when stone embedment and the underlying assembly cannot be established.
+- Use `ballasted_or_tar_and_gravel`, displayed as **Ballasted or Tar and Gravel**, when a tan aggregate-covered roof is established but the stone-size/color transition at the edge, stone embedment, and underlying assembly cannot be resolved well enough to choose ballasted or BUR.
 - Use `unknown/indeterminate roof type` rather than forcing a candidate from color alone.
 - Return the canonical type `metal` whenever metal is supported. Describe a subtype such as standing seam, ribbed, or corrugated only in supporting observations, and only when the profile is clearly resolved.
 - Do not classify a dark low-slope zone as metal from faint parallel lines or apparent panel divisions alone. Require clear rigid planes, repeated raised ribs with consistent shadows, or metal edge/ridge detailing. If those cues are unresolved and the surface is plausibly a dark membrane, prefer `epdm`, `mod_bit`, or `epdm_or_mod_bit` with metal retained only as an alternative.

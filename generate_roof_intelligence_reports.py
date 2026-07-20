@@ -510,6 +510,39 @@ def roof_candidate_schema(config: RoofReferenceConfig) -> dict:
                         "zone_id": {"type": "string"},
                         "location": {"type": "string"},
                         "estimated_area_percentage": {"type": "integer", "minimum": 0, "maximum": 100},
+                        "visual_evidence": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "color_family": {
+                                    "type": "string",
+                                    "enum": [
+                                        "white", "light_gray", "gray", "black", "tan", "metallic", "other", "uncertain",
+                                    ],
+                                },
+                                "seam_pattern": {
+                                    "type": "string",
+                                    "enum": ["broad_sheet_seams", "narrow_roll_laps", "no_visible_seams", "uncertain"],
+                                },
+                                "surface_texture": {
+                                    "type": "string",
+                                    "enum": ["smooth", "granular", "loose_stone", "ribbed", "mixed", "uncertain"],
+                                },
+                                "perimeter_stone_transition": {
+                                    "type": "string",
+                                    "enum": ["distinct", "not_apparent", "not_applicable", "uncertain"],
+                                },
+                                "ridge_pattern": {
+                                    "type": "string",
+                                    "enum": ["long_parallel_raised", "not_apparent", "uncertain"],
+                                },
+                                "evidence_summary": {"type": "string"},
+                            },
+                            "required": [
+                                "color_family", "seam_pattern", "surface_texture", "perimeter_stone_transition",
+                                "ridge_pattern", "evidence_summary",
+                            ],
+                        },
                         "candidates": {
                             "type": "array",
                             "minItems": 1,
@@ -536,6 +569,7 @@ def roof_candidate_schema(config: RoofReferenceConfig) -> dict:
                         "zone_id",
                         "location",
                         "estimated_area_percentage",
+                        "visual_evidence",
                         "candidates",
                         "limitations",
                     ],
@@ -567,6 +601,7 @@ def reference_analysis_schema() -> dict:
         "epdm_or_mod_bit",
         "mod_bit_or_coating",
         "mod_bit_or_tar_and_gravel",
+        "ballasted_or_tar_and_gravel",
         "unknown",
     ]
     schema["properties"]["building_classification"] = {
@@ -632,12 +667,14 @@ def roof_candidate_prompt(row: dict, config: RoofReferenceConfig) -> str:
     }
     return (
         "Stage 1 roof-type candidate classification. Analyze only the target building aerial image and supplied "
-        "metadata. Divide materially different roof areas into zones before choosing candidates. Return one to three "
+        "metadata. Divide materially different roof areas into zones before choosing candidates. For every zone, first "
+        "record the required visual_evidence fields without naming a material; then use those observations to return one to three "
         "evidence-supported candidate keys per zone, ordered most likely first. Use confidence conservatively; do not "
         "force exact membrane chemistry from color alone. When a smooth white membrane-like surface cannot be separated "
         "among TPO, PVC, and coating, rank tpo first with reduced confidence; rank pvc or coating first only when their "
         "specific evidence is clear. Do not apply the TPO default to weathered asphaltic or aggregate-textured roofs. Use the "
-        "canonical key metal without assigning a metal subtype. Use estimated_area_percentage=0 when the visible share cannot "
+        "Treat no_visible_seams as an observation only when the image is sharp enough that seams should be visible; otherwise "
+        "record uncertain. Use the canonical key metal without assigning a metal subtype. Use estimated_area_percentage=0 when the visible share cannot "
         "be estimated responsibly. Evaluate target-image sharpness and resolution before assigning confidence. If the image "
         "does not resolve the seams, ribs, edges, texture, or application pattern needed to distinguish the leading type, "
         "cap that zone confidence and overall ai_confidence at 60 and state the limitation. Reference images are intentionally "
@@ -678,7 +715,10 @@ def reference_analysis_prompt(
         "consistent membrane-sheet grid. A tan matte weathered asphaltic field may be modified bitumen even when roll laps "
         "fall below image resolution, especially beside a distinct smooth white TPO zone. For an asphaltic or aggregate-looking zone where roll "
         "laps and stone embedment cannot be resolved, use "
-        "mod_bit_or_tar_and_gravel rather than guessing. If the building is mixed, set the legacy roof_type to "
+        "mod_bit_or_tar_and_gravel rather than guessing. For a tan aggregate-covered zone that cannot be separated between "
+        "a ballasted membrane and tar-and-gravel/BUR, use ballasted_or_tar_and_gravel. A distinct change to larger or differently "
+        "colored stone around the perimeter strongly favors ballasted; when that transition is not resolved, retain the controlled "
+        "ambiguity rather than guessing. If the building is mixed, set the legacy roof_type to "
         "'Mixed roof types'; the application will derive "
         "the legacy roof_system summary from canonical zones. If the target image cannot resolve the distinguishing material "
         "cues, cap the affected zone confidence and overall ai_confidence at 60. Return JSON only. "
@@ -906,6 +946,23 @@ def validate_candidate_analysis(stage1: dict) -> None:
     for index, zone in enumerate(zones):
         if not isinstance(zone, dict) or not isinstance(zone.get("candidates"), list) or not zone["candidates"]:
             raise RuntimeError(f"Roof-reference Stage 1 zone {index + 1} returned no candidates")
+        visual_evidence = zone.get("visual_evidence")
+        if not isinstance(visual_evidence, dict):
+            raise RuntimeError(f"Roof-reference Stage 1 zone {index + 1} returned no visual_evidence")
+        required_evidence = {
+            "color_family",
+            "seam_pattern",
+            "surface_texture",
+            "perimeter_stone_transition",
+            "ridge_pattern",
+            "evidence_summary",
+        }
+        missing_evidence = sorted(key for key in required_evidence if key not in visual_evidence)
+        if missing_evidence:
+            raise RuntimeError(
+                f"Roof-reference Stage 1 zone {index + 1} omitted visual evidence: "
+                + ", ".join(missing_evidence)
+            )
 
 
 def validate_reference_analysis(analysis: dict) -> None:
@@ -937,6 +994,7 @@ def normalize_reference_analysis(analysis: dict) -> None:
         "epdm_or_mod_bit": "EPDM or Modified Bitumen",
         "mod_bit_or_coating": "Modified Bitumen or Coated Roof",
         "mod_bit_or_tar_and_gravel": "Modified Bitumen or Tar and Gravel",
+        "ballasted_or_tar_and_gravel": "Ballasted or Tar and Gravel",
         "unknown": "Unknown",
     }
     zone_types: list[str] = []

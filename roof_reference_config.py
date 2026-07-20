@@ -207,9 +207,15 @@ def select_reference_types(stage1: dict, config: RoofReferenceConfig) -> list[st
     ranked_by_zone: list[list[str]] = []
     observed_candidate_keys: set[str] = set()
     leading_candidate_keys: set[str] = set()
+    observed_color_families: set[str] = set()
     for zone in zones or []:
         if not isinstance(zone, dict):
             continue
+        visual_evidence = zone.get("visual_evidence")
+        if isinstance(visual_evidence, dict):
+            color_family = str(visual_evidence.get("color_family") or "").strip().lower()
+            if color_family:
+                observed_color_families.add(color_family)
         candidates = zone.get("candidates") or []
         ranked = []
         for candidate_index, candidate in enumerate(candidates):
@@ -245,6 +251,15 @@ def select_reference_types(stage1: dict, config: RoofReferenceConfig) -> list[st
     if {"epdm", "mod_bit"}.intersection(observed_candidate_keys):
         add("mod_bit")
         add("epdm")
+
+    # Gray roofs need a direct weathered-TPO versus modified-bitumen
+    # comparison even when Stage 1 returned only one side of that ambiguity.
+    if observed_color_families.intersection({"light_gray", "gray"}) and {
+        "tpo",
+        "mod_bit",
+    }.intersection(observed_candidate_keys):
+        add("tpo")
+        add("mod_bit")
 
     # A proposed coating can conceal an asphaltic substrate, so include the
     # modified-bitumen comparison even when coating is not the leading type.

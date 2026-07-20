@@ -1,5 +1,5 @@
 schema_version: 1
-workflow_version: "1.3"
+workflow_version: "1.4"
 classification_guide: docs/ai/roof_type_classification.md
 maximum_candidate_types: 5
 

@@ -111,6 +111,20 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
         stage1 = {"roof_zones": [{"candidates": [{"roof_type": "pvc", "confidence": 78}]}]}
         self.assertIn("pvc", select_reference_types(stage1, config))
 
+    def test_gray_tpo_candidate_adds_modified_bitumen_comparison(self) -> None:
+        config = load_roof_reference_config()
+        stage1 = {
+            "roof_zones": [
+                {
+                    "visual_evidence": {"color_family": "gray"},
+                    "candidates": [{"roof_type": "tpo", "confidence": 58}],
+                }
+            ]
+        }
+        selected = select_reference_types(stage1, config)
+        self.assertIn("tpo", selected)
+        self.assertIn("mod_bit", selected)
+
 
 class RoofReferenceRequestTests(unittest.TestCase):
     @classmethod
@@ -124,6 +138,14 @@ class RoofReferenceRequestTests(unittest.TestCase):
                     "zone_id": "A",
                     "location": "main roof",
                     "estimated_area_percentage": 70,
+                    "visual_evidence": {
+                        "color_family": "white",
+                        "seam_pattern": "broad_sheet_seams",
+                        "surface_texture": "smooth",
+                        "perimeter_stone_transition": "not_applicable",
+                        "ridge_pattern": "not_apparent",
+                        "evidence_summary": "Smooth white field with broad sheet seams",
+                    },
                     "candidates": [
                         {"roof_type": "tpo", "confidence": 70, "evidence": "white broad sheets"}
                     ],
@@ -133,6 +155,14 @@ class RoofReferenceRequestTests(unittest.TestCase):
                     "zone_id": "B",
                     "location": "entrance",
                     "estimated_area_percentage": 30,
+                    "visual_evidence": {
+                        "color_family": "metallic",
+                        "seam_pattern": "no_visible_seams",
+                        "surface_texture": "ribbed",
+                        "perimeter_stone_transition": "not_applicable",
+                        "ridge_pattern": "long_parallel_raised",
+                        "evidence_summary": "Rigid field with long parallel raised ribs",
+                    },
                     "candidates": [
                         {"roof_type": "metal", "confidence": 90, "evidence": "raised ribs"}
                     ],
@@ -144,13 +174,27 @@ class RoofReferenceRequestTests(unittest.TestCase):
 
     def test_schemas_require_zone_level_output(self) -> None:
         self.assertIn("roof_zones", roof_candidate_schema(self.config)["required"])
+        candidate_zone = roof_candidate_schema(self.config)["properties"]["roof_zones"]["items"]
+        self.assertIn("visual_evidence", candidate_zone["required"])
+        self.assertEqual(
+            set(candidate_zone["properties"]["visual_evidence"]["required"]),
+            {
+                "color_family",
+                "seam_pattern",
+                "surface_texture",
+                "perimeter_stone_transition",
+                "ridge_pattern",
+                "evidence_summary",
+            },
+        )
         self.assertIn("roof_zones", reference_analysis_schema()["required"])
         zone_type = reference_analysis_schema()["properties"]["roof_zones"]["items"]["properties"]["roof_type"]
         self.assertEqual(
             zone_type["enum"],
             [
                 "tpo", "pvc", "epdm", "ballasted", "metal", "mod_bit", "tar_and_gravel", "coating", "pvc_or_coating",
-                "epdm_or_mod_bit", "mod_bit_or_coating", "mod_bit_or_tar_and_gravel", "unknown",
+                "epdm_or_mod_bit", "mod_bit_or_coating", "mod_bit_or_tar_and_gravel",
+                "ballasted_or_tar_and_gravel", "unknown",
             ],
         )
 
@@ -181,6 +225,8 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("Central classification guide", text)
         self.assertIn("Required Ambiguity Rules", text)
         self.assertIn("cap that zone confidence and overall ai_confidence at 60", text)
+        self.assertIn("first record the required visual_evidence fields", text)
+        self.assertIn("Fundamental Material Priors", text)
         self.assertEqual(len(images), 1)
         self.assertTrue(images[0]["image_url"].startswith("data:image/jpeg;base64,"))
 
@@ -208,6 +254,8 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("use pvc_or_coating", openai_text)
         self.assertIn("Favor pvc_or_coating over TPO", openai_text)
         self.assertIn("tan matte weathered asphaltic field may be modified bitumen", openai_text)
+        self.assertIn("use ballasted_or_tar_and_gravel", openai_text)
+        self.assertIn("Fundamental Material Priors", openai_text)
         self.assertIn("cap the affected zone confidence and overall ai_confidence at 60", openai_text)
 
     def test_trace_records_manifest_guides_images_and_stage1(self) -> None:
