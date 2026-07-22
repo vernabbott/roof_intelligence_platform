@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotpointiq.local/contracts/roof-intelligence-report-snapshot-v1.schema.json",
+  "title": "PilotPoint IQ Roof Intelligence Report Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "report_id",
+    "revision",
+    "property",
+    "report_fields",
+    "analysis",
+    "imagery",
+    "calculations",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "snapshot_id": { "type": "string", "minLength": 1 },
+    "report_id": { "type": "string", "minLength": 1 },
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "kind",
+        "parent_snapshot_id",
+        "created_at",
+        "created_by",
+        "change_reason",
+        "manual_edits"
+      ],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["initial", "manual_edit"] },
+        "parent_snapshot_id": { "type": ["string", "null"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": ["string", "null"] },
+        "change_reason": { "type": "string", "minLength": 1 },
+        "manual_edits": { "type": "object" }
+      }
+    },
+    "property": {
+      "type": "object",
+      "required": ["canonical_key", "address"],
+      "properties": {
+        "property_id": { "type": ["string", "null"] },
+        "canonical_key": { "type": "string", "minLength": 1 },
+        "canonical_footprint_id": { "type": ["integer", "null"] },
+        "address": { "type": "string", "minLength": 1 },
+        "city": { "type": ["string", "null"] },
+        "state": { "type": ["string", "null"] },
+        "zip_code": { "type": ["string", "null"] },
+        "county": { "type": ["string", "null"] },
+        "parcel_number": { "type": ["string", "null"] },
+        "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 }
+      },
+      "additionalProperties": true
+    },
+    "report_fields": {
+      "type": "object",
+      "required": ["roof_area_sqft", "roof_squares"],
+      "properties": {
+        "roof_area_sqft": { "type": "number", "minimum": 0 },
+        "roof_squares": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "analysis": {
+      "type": "object",
+      "required": [
+        "roof_type",
+        "roof_system",
+        "overall_score",
+        "condition_label",
+        "risk_level",
+        "summary",
+        "recommendation"
+      ],
+      "properties": {
+        "roof_type": { "type": "string" },
+        "roof_system": { "type": "string" },
+        "overall_score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "condition_label": { "enum": ["GOOD", "FAIR", "POOR"] },
+        "risk_level": { "enum": ["LOW", "MODERATE", "HIGH"] },
+        "summary": { "type": "string" },
+        "recommendation": { "type": "string" },
+        "observations": { "type": "array", "items": { "type": "string" } },
+        "breakdown": { "type": "object" },
+        "roof_zones": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": true
+    },
+    "imagery": {
+      "type": "object",
+      "required": ["source", "capture_date", "limitations"],
+      "properties": {
+        "source": { "type": "string" },
+        "capture_date": { "type": ["string", "null"] },
+        "report_image_asset_id": { "type": ["string", "null"] },
+        "limitations": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "calculations": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "calculation_version",
+        "roof_area_sqft",
+        "roof_squares",
+        "roof_condition_score",
+        "condition_label",
+        "risk_level",
+        "replacement",
+        "overlay",
+        "coating"
+      ],
+      "properties": {
+        "calculation_version": { "const": "cost-estimation-v1" },
+        "roof_area_sqft": { "type": "number", "minimum": 0 },
+        "roof_squares": { "type": "number", "minimum": 0 },
+        "roof_condition_score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "condition_label": { "enum": ["GOOD", "FAIR", "POOR"] },
+        "risk_level": { "enum": ["LOW", "MODERATE", "HIGH"] },
+        "replacement": { "$ref": "#/$defs/costEstimate" },
+        "overlay": { "$ref": "#/$defs/costEstimate" },
+        "coating": {
+          "type": "object",
+          "required": ["roof_area_sqft", "warranty_options"],
+          "properties": {
+            "roof_area_sqft": { "type": "number", "minimum": 0 },
+            "warranty_options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "years",
+                  "minimum_cost_per_sqft",
+                  "maximum_cost_per_sqft",
+                  "minimum_total_cost",
+                  "maximum_total_cost"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "source_refreshed_at",
+        "manual_fields",
+        "persistent_square_footage_override"
+      ],
+      "properties": {
+        "source_refreshed_at": { "type": "string", "format": "date-time" },
+        "manual_fields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "roof_area_sqft",
+              "roof_type",
+              "roof_system",
+              "roof_condition_score",
+              "report_summary",
+              "recommendation"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "persistent_square_footage_override": { "type": "boolean" },
+        "workflow_version": { "type": ["string", "null"] },
+        "renderer_version": { "type": ["string", "null"] },
+        "ai_provider": { "type": ["string", "null"] },
+        "ai_model": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "$defs": {
+    "costEstimate": {
+      "type": "object",
+      "required": [
+        "cost_per_sqft",
+        "subtotal",
+        "contingency_percentage",
+        "contingency_cost",
+        "total_project_cost"
+      ],
+      "properties": {
+        "cost_per_sqft": { "type": "number", "minimum": 0 },
+        "subtotal": { "type": "number", "minimum": 0 },
+        "contingency_percentage": { "type": "number", "minimum": 0 },
+        "contingency_cost": { "type": "number", "minimum": 0 },
+        "total_project_cost": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
+  }
+}

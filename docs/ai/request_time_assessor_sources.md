@@ -68,7 +68,7 @@ For Denver, Adams, Arapahoe and Jefferson, the selected Microsoft footprint is c
 
 ## Scheduled health check
 
-`county_discovery_health.py` runs a bounded live address through parcel, Supabase footprint, county secondary footprint where configured, assessor and imagery discovery for each county. It writes machine-readable JSON and returns a nonzero status for unavailable services. `--strict-discrepancies` also fails when the county footprint is more than 5% larger than Microsoft.
+`county_discovery_health.py` runs bounded live addresses through parcel, Supabase footprint, county secondary footprint where configured, assessor and imagery discovery for each county. With `--all-samples`, two passing addresses are `healthy`, one passing address is `degraded`, and no passing addresses are `failed`. It writes machine-readable JSON and returns a nonzero status when at least one county is fully failed. `--strict-discrepancies` treats an address as failed when the county footprint is more than 5% larger than Microsoft.
 
 ```bash
 ./.venv/bin/python county_discovery_health.py \

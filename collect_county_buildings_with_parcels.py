@@ -1449,6 +1449,56 @@ def fetch_image_tile(service_url: str, level: int, row: int, col: int):
         return Image.open(BytesIO(response.read())).convert("RGB")
 
 
+def save_cached_tile_crop(
+    bounds: tuple[float, float, float, float],
+    service_url: str,
+    level: int,
+    output_path: str,
+    max_pixels: int,
+    extension: str,
+    minimum_pixels: int = 0,
+) -> str:
+    """Build a crop from a cached MapServer when its export operation fails."""
+    col_min, col_max, row_min, row_max, resolution = web_mercator_tile_indices(bounds, level)
+
+    cols = range(col_min, col_max + 1)
+    rows = range(row_min, row_max + 1)
+    mosaic = Image.new("RGB", (len(cols) * 256, len(rows) * 256))
+    for row in rows:
+        for col in cols:
+            tile = fetch_image_tile(service_url, level, row, col)
+            mosaic.paste(tile, ((col - col_min) * 256, (row - row_min) * 256))
+
+    minx, miny, maxx, maxy = bounds
+    origin_x = -20037508.342787
+    origin_y = 20037508.342787
+    tile_span = 256 * resolution
+    mosaic_minx = origin_x + (col_min * tile_span)
+    mosaic_maxy = origin_y - (row_min * tile_span)
+    crop_box = (
+        max(0, round((minx - mosaic_minx) / resolution)),
+        max(0, round((mosaic_maxy - maxy) / resolution)),
+        min(mosaic.width, round((maxx - mosaic_minx) / resolution)),
+        min(mosaic.height, round((mosaic_maxy - miny) / resolution)),
+    )
+    crop = mosaic.crop(crop_box)
+    if crop.width < 1 or crop.height < 1:
+        raise RuntimeError("Cached MapServer tiles produced an empty aerial crop")
+
+    max_pixels = int(max_pixels or AI_CROP_PIXELS)
+    if max(crop.size) > max_pixels:
+        crop.thumbnail((max_pixels, max_pixels), Image.Resampling.LANCZOS)
+    elif minimum_pixels and max(crop.size) < minimum_pixels:
+        scale = minimum_pixels / max(crop.size)
+        crop = crop.resize(
+            (max(1, round(crop.width * scale)), max(1, round(crop.height * scale))),
+            Image.Resampling.LANCZOS,
+        )
+
+    crop.save(output_path, "WEBP" if extension == "webp" else "JPEG", quality=88)
+    return output_path
+
+
 def save_ai_crop_image(
     record: dict,
     source: dict,
@@ -1474,60 +1524,49 @@ def save_ai_crop_image(
     if source.get("kind") in ("ImageServer", "MapServer"):
         response_format = "json" if source.get("kind") == "MapServer" else "image"
         crop_url = export_raster_crop_url(source, bounds, max_pixels, image_format, response_format=response_format)
-        request = Request(crop_url, headers={"User-Agent": "Python Building Collector"})
-        with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-            if response_format == "json":
-                payload = json.load(response)
-                image_url = payload.get("href")
-                if not image_url:
-                    raise RuntimeError(f"MapServer export returned no image URL: {payload}")
-                image_request = Request(str(image_url), headers={"User-Agent": "Python Building Collector"})
-                with urlopen(image_request, timeout=REQUEST_TIMEOUT) as image_response:
-                    data = image_response.read()
-            else:
-                data = response.read()
-        with open(output_path, "wb") as handle:
-            handle.write(data)
-        return output_path
+        try:
+            request = Request(crop_url, headers={"User-Agent": "Python Building Collector"})
+            with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+                if response_format == "json":
+                    payload = json.load(response)
+                    image_url = payload.get("href")
+                    if not image_url:
+                        raise RuntimeError(f"MapServer export returned no image URL: {payload}")
+                    image_request = Request(str(image_url), headers={"User-Agent": "Python Building Collector"})
+                    with urlopen(image_request, timeout=REQUEST_TIMEOUT) as image_response:
+                        data = image_response.read()
+                else:
+                    data = response.read()
+            with open(output_path, "wb") as handle:
+                handle.write(data)
+            return output_path
+        except Exception:
+            tile_service_url = str(source.get("crop_tile_service_url") or "").strip()
+            if not tile_service_url:
+                raise
+            return save_cached_tile_crop(
+                bounds,
+                tile_service_url,
+                int(source.get("crop_tile_level") or AI_CROP_TILE_LEVEL),
+                output_path,
+                max_pixels,
+                extension,
+                minimum_pixels=max_pixels,
+            )
 
     if source.get("kind") == "DRAPPOriginalTile" and not source.get("crop_tile_service_url"):
         # Current DRCOG archive entries expose original GeoTIFFs but no public
         # tiled crop endpoint. Keep them available for original-tile mode and
         # let another configured imagery source supply the AI crop.
         return ""
-    level = int(source.get("crop_tile_level") or AI_CROP_TILE_LEVEL)
-    service_url = str(source.get("crop_tile_service_url") or AI_CROP_TILE_SERVICE_URL)
-    col_min, col_max, row_min, row_max, resolution = web_mercator_tile_indices(bounds, level)
-
-    cols = range(col_min, col_max + 1)
-    rows = range(row_min, row_max + 1)
-    mosaic = Image.new("RGB", (len(cols) * 256, len(rows) * 256))
-    for row in rows:
-        for col in cols:
-            tile = fetch_image_tile(service_url, level, row, col)
-            mosaic.paste(tile, ((col - col_min) * 256, (row - row_min) * 256))
-
-    minx, miny, maxx, maxy = bounds
-    origin_x = -20037508.342787
-    origin_y = 20037508.342787
-    tile_span = 256 * resolution
-    mosaic_minx = origin_x + (col_min * tile_span)
-    mosaic_maxy = origin_y - (row_min * tile_span)
-    crop_box = (
-        max(0, round((minx - mosaic_minx) / resolution)),
-        max(0, round((mosaic_maxy - maxy) / resolution)),
-        min(mosaic.width, round((maxx - mosaic_minx) / resolution)),
-        min(mosaic.height, round((mosaic_maxy - miny) / resolution)),
+    return save_cached_tile_crop(
+        bounds,
+        str(source.get("crop_tile_service_url") or AI_CROP_TILE_SERVICE_URL),
+        int(source.get("crop_tile_level") or AI_CROP_TILE_LEVEL),
+        output_path,
+        max_pixels,
+        extension,
     )
-    crop = mosaic.crop(crop_box)
-
-    max_pixels = int(max_pixels or AI_CROP_PIXELS)
-    if max(crop.size) > max_pixels:
-        crop.thumbnail((max_pixels, max_pixels), Image.Resampling.LANCZOS)
-
-    save_kwargs = {"quality": 88}
-    crop.save(output_path, "WEBP" if extension == "webp" else "JPEG", **save_kwargs)
-    return output_path
 
 
 def download_original_tile_images(record: dict, image_dir: str) -> None:

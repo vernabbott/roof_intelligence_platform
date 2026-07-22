@@ -1,6 +1,12 @@
 import unittest
 from datetime import date
+from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
+
+from PIL import Image
+from shapely.geometry import box
 
 import collect_county_buildings_with_parcels as collector
 from county_config import ADAMS_IMAGERY_SOURCES, DENVER_IMAGERY_SOURCES, JEFFERSON_IMAGERY_SOURCES
@@ -76,6 +82,35 @@ class AerialImageryTests(unittest.TestCase):
             self.assertEqual(record["primary_aerial_image_file"], "/tmp/fallback.jpg")
         finally:
             collector.IMAGERY_SOURCES = original_sources
+
+    def test_cached_tiles_are_used_when_mapserver_export_is_empty(self):
+        source = {
+            "key": "world_imagery",
+            "kind": "MapServer",
+            "url": "https://example.test/MapServer",
+            "crop_tile_service_url": "https://example.test/MapServer",
+            "crop_tile_level": 19,
+            "image_crs": 3857,
+            "image_units": "meters",
+            "min_export_pixels": 640,
+            "max_export_pixels": 640,
+        }
+        polygon = box(-11688400, 4827560, -11688340, 4827620)
+        with TemporaryDirectory() as directory, (
+            patch.object(collector, "building_polygon_for_imagery_source", return_value=polygon)
+        ), patch.object(
+            collector, "urlopen", return_value=BytesIO(b'{"href": ""}')
+        ), patch.object(
+            collector, "fetch_image_tile", return_value=Image.new("RGB", (256, 256), "green")
+        ):
+            output = collector.save_ai_crop_image(
+                {"parcel_number": "test-parcel"}, source, directory, 640, 40, "jpg"
+            )
+
+            self.assertTrue(Path(output).is_file())
+            with Image.open(output) as image:
+                self.assertEqual(max(image.size), 640)
+            self.assertEqual(collector.image_qa(output)["status"], "blank")
 
     def test_year_only_imagery_date_is_used_conservatively(self):
         row = {"Primary Aerial Photo Date": "2022"}

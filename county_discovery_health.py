@@ -32,6 +32,27 @@ SAMPLE_ADDRESSES = {
 }
 
 
+def aggregate_sample_status(samples: list[dict]) -> str:
+    """Grade a county without treating one property-specific miss as an outage."""
+    if not samples:
+        return "failed"
+    passed = sum(sample.get("status") == "healthy" for sample in samples)
+    if passed == len(samples):
+        return "healthy"
+    if passed:
+        return "degraded"
+    return "failed"
+
+
+def aggregate_county_status(results: list[dict]) -> str:
+    statuses = {result.get("status") for result in results}
+    if "failed" in statuses:
+        return "failed"
+    if "degraded" in statuses:
+        return "degraded"
+    return "healthy"
+
+
 def cleanup_orphan_imagery(max_age_days: int = 7) -> int:
     cutoff = time.time() - max(1, int(max_age_days)) * 86400
     root = PROJECT_DIR / "aerial_images_single_address"
@@ -128,7 +149,7 @@ def check_county(county: str, address: str, collector, single, profiles, fetch_a
         warnings.append("Imagery source did not publish a capture date.")
     return {
         "county": profile.display_name,
-        "status": "ok",
+        "status": "healthy",
         "address": address,
         "parcel": parcel_id,
         "address_score": score,
@@ -171,7 +192,6 @@ def main() -> int:
     if args.address and len(counties) != 1:
         parser.error("--address requires exactly one --county")
     results = []
-    failed = False
     for county in counties:
         sample_results = []
         addresses = (args.address,) if args.address else (
@@ -188,20 +208,24 @@ def main() -> int:
             except Exception as exc:
                 sample = {"status": "failed", "address": address, "error": str(exc)}
             sample_results.append(sample)
-        county_failed = any(sample["status"] == "failed" for sample in sample_results)
-        failed = failed or county_failed
+        county_status = aggregate_sample_status(sample_results)
+        passed_count = sum(sample.get("status") == "healthy" for sample in sample_results)
         results.append(
             {
                 "county": COUNTY_PROFILES[county].display_name,
-                "status": "failed" if county_failed else "ok",
+                "status": county_status,
                 "error": next((sample.get("error") for sample in sample_results if sample.get("error")), ""),
+                "sample_count": len(sample_results),
+                "passed_count": passed_count,
+                "failed_count": len(sample_results) - passed_count,
                 "samples": sample_results,
             }
         )
 
+    overall_status = aggregate_county_status(results)
     payload = {
         "checked_at": datetime.now(timezone.utc).isoformat(),
-        "status": "failed" if failed else "ok",
+        "status": overall_status,
         "results": results,
     }
     if args.cleanup_orphans:
@@ -215,7 +239,7 @@ def main() -> int:
         from roof_intelligence_jobs import RoofIntelligenceJobStore
 
         RoofIntelligenceJobStore().record_county_health(payload)
-    return 1 if failed else 0
+    return 1 if overall_status == "failed" else 0
 
 
 if __name__ == "__main__":

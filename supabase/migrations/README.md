@@ -34,3 +34,32 @@ The Phase 1 baseline stores property-management companies and their contacts
 only. It does not associate a company or contact with a property, parcel,
 building footprint, roof report, or other building record. Those relationships
 are future feature work and require a separate migration and design review.
+
+## Roof Intelligence reporting structure
+
+| Migration | PCS status |
+|---|---|
+| `20260722000100_create_roof_intelligence_reporting.sql` | Applied and verified July 22, 2026 |
+| `20260722000200_prepare_roof_intelligence_cutover.sql` | Applied and verified July 22, 2026 |
+
+This migration creates empty centralized Roof Intelligence job, property,
+report, immutable revision, asset, notification, and county-health structures,
+plus private PDF and image buckets. It intentionally imports none of the local
+test reports or artifacts and does not change PCS or PilotPoint runtime behavior.
+
+Row-level security is enabled without browser-facing policies. Application
+access policies will be added only when the PCS authentication and integration
+work begins.
+
+Live verification confirmed that all eight tables were empty after creation,
+both Storage buckets were private, row-level security was enabled on every new
+table, and no browser-facing policies existed. The configured Supabase project
+does not currently contain a `supabase_migrations.schema_migrations` history
+table, so this repository ledger remains the record of manually applied
+baseline migrations.
+
+The cutover-preparation migration was rehearsed with a forced rollback before
+application. Follow-up verification confirmed that its property-override table
+was empty, its retention and override lifecycle passed inside a rolled-back
+transaction, and only `service_role` can execute the atomic worker-claim
+function. PCS and PilotPoint do not call these structures yet.
