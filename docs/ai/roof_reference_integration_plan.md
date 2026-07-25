@@ -14,13 +14,19 @@ Enable it for the PCS report worker through `.env` or the process environment:
 ROOF_REFERENCE_CLASSIFICATION=1
 ```
 
-Every image listed under a selected roof type's `reference_images` is supplied
-to Stage 2 by default. There is no separate active-image list, so adding an
-approved positive example automatically makes it part of future comparisons.
-`ROOF_REFERENCE_IMAGES_PER_TYPE` is an explicit emergency cost/size override:
-set it to a positive integer to cap each type, or leave it unset/use `all` to
-retain complete reference coverage. The report trace records approved and used
-counts so incomplete coverage is visible.
+Every image listed under a selected roof type's `reference_images` is eligible
+for deterministic retrieval. Images are normalized to a common square canvas,
+ranked against the target, and a balanced top-reference bundle is supplied to
+Stage 2. The default limits are eight total images and two per roof type.
+`ROOF_REFERENCE_MAX_RETRIEVED_IMAGES` and
+`ROOF_REFERENCE_IMAGES_PER_TYPE` can override those limits. The report trace
+records approved sources, normalized inputs, similarity scores, and used
+counts.
+
+Before Stage 1, the workflow also checks reviewer-confirmed known-building
+metadata. An exact parcel number + imagery source + imagery date match bypasses
+material inference, locks the canonical roof material, and still uses Stage 2
+to assess condition and other visible characteristics.
 
 When enabled, a roof-reference failure automatically retries the legacy provider call. Static fallback output is used only when provider analysis also fails and `--allow-ai-fallback` is enabled.
 
@@ -56,9 +62,9 @@ Require the model to:
 
 For the leading candidates from Stage 1, provide the model with:
 
-- The target building aerial image
+- The normalized target-building crop
 - The complete identification guide for each selected roof type
-- Every approved positive reference image for each selected roof type
+- A balanced, similarity-ranked subset of normalized positive references
 
 Require the model to return the final zone-level classification, confidence, supporting cues, remaining alternatives, and image limitations.
 
@@ -69,6 +75,7 @@ Create a central, explicit manifest that maps each supported roof type to:
 - Canonical classification name
 - Identification-guide path
 - Positive identification-image paths
+- Optional crop, visible-cue, condition-tag, and known-building metadata
 - Optional aliases
 - Enabled or disabled status
 
@@ -88,8 +95,8 @@ Use the same manifest and candidate-selection rules for both providers.
 
 ## Request Controls
 
-- Use every manifest-approved reference image by default; any runtime cap must
-  be an explicit, traceable override.
+- Consider every manifest-approved reference image during deterministic
+  retrieval and send the configured top-reference subset.
 - Label every reference image with its roof type and filename in the request.
 - Keep positive identification examples separate from damage examples.
 - Validate that every configured guide and image exists before starting an AI request.
@@ -122,10 +129,13 @@ run:
 ```text
 python3 scripts/validate_roof_reference_library.py
 python3 -m unittest tests.test_roof_reference_workflow
+python3 scripts/evaluate_roof_reference_library.py
 ```
 
 The validator enforces guide/manifest parity, substantive image descriptions,
 unique positive image content, valid paths, and complete runtime registration.
+Corrected production examples are also registered as offline evaluation cases,
+so exact matching and retrieval quality are checked without paid API calls.
 
 ## Verification Tests
 

@@ -74,6 +74,30 @@ def duplicate_content_errors(config) -> list[str]:
     return errors
 
 
+def known_building_identity_errors(config) -> list[str]:
+    seen: dict[tuple[str, str, str], tuple[str, Path]] = {}
+    errors: list[str] = []
+    for roof_type, item in config.roof_types.items():
+        for reference in item.reference_images:
+            for identity in reference.known_buildings:
+                key = (
+                    re.sub(r"[^a-z0-9]+", "", identity.parcel_id.lower()),
+                    re.sub(r"[^a-z0-9]+", "", identity.image_source.lower()),
+                    re.sub(r"[^0-9]+", "", identity.image_date),
+                )
+                previous = seen.get(key)
+                if previous:
+                    previous_type, previous_path = previous
+                    errors.append(
+                        "duplicate known-building identity: "
+                        f"{previous_type}/{previous_path.name} and "
+                        f"{roof_type}/{reference.path.name}"
+                    )
+                else:
+                    seen[key] = (roof_type, reference.path)
+    return errors
+
+
 def main() -> int:
     try:
         config = load_roof_reference_config()
@@ -85,6 +109,7 @@ def main() -> int:
     for item in config.roof_types.values():
         errors.extend(guide_example_errors(item.guide_path))
     errors.extend(duplicate_content_errors(config))
+    errors.extend(known_building_identity_errors(config))
 
     if errors:
         for error in errors:

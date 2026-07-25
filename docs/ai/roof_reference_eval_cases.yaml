@@ -1,0 +1,11 @@
+schema_version: 1
+cases:
+  - id: dartmouth_modified_bitumen
+    target_image: aerial_images_single_address/world_imagery/0533100022000-world_imagery-ai-target.png
+    property:
+      Parcel Number: "0533100022000"
+      Primary Aerial Source: Esri World Imagery
+      Primary Aerial Photo Date: "2025-09-06"
+    expected_roof_type: mod_bit
+    expected_known_match: true
+    expected_top_reference: docs/ai/roof_reference_library/mod_bit/images/aging_002.png

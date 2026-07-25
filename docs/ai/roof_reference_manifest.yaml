@@ -1,5 +1,5 @@
-schema_version: 1
-workflow_version: "1.6"
+schema_version: 2
+workflow_version: "2.0"
 classification_guide: docs/ai/roof_type_classification.md
 maximum_candidate_types: 5
 
@@ -74,7 +74,17 @@ roof_types:
       - docs/ai/roof_reference_library/mod_bit/images/mod_bit_003.jpeg
       - docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg
       - docs/ai/roof_reference_library/mod_bit/images/aging_001.png
-      - docs/ai/roof_reference_library/mod_bit/images/aging_002.png
+      - path: docs/ai/roof_reference_library/mod_bit/images/aging_002.png
+        reviewer_confirmed: true
+        crop_box: [0.14, 0.04, 0.88, 0.93]
+        known_buildings:
+          - parcel_id: "0533100022000"
+            image_source: Esri World Imagery
+            image_date: "2025-09-06"
+        cues:
+          - Light, heavily weathered asphaltic field with repeated narrow roll-lap geometry.
+          - Numerous rectangular patch and repair outlines with localized perimeter deterioration.
+        condition_tags: [significant_aging, weathering, patching]
   tar_and_gravel:
     label: Tar and gravel / BUR
     enabled: true

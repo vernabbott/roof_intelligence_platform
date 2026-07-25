@@ -15,11 +15,13 @@ from generate_roof_intelligence_reports import (
     encode_image_data_url,
     image_mime_type,
     load_or_create_analysis,
+    maximum_retrieved_reference_images,
     normalize_reference_analysis,
     reference_images_per_type,
     reference_analysis_schema,
     roof_candidate_schema,
 )
+from scripts.evaluate_roof_reference_library import evaluate
 from roof_assessment import canonical_observations
 from roof_reference_config import (
     DEFAULT_ROOF_REFERENCE_MANIFEST_PATH,
@@ -30,6 +32,13 @@ from roof_reference_config import (
     roof_reference_feature_enabled,
     roof_reference_trace,
     select_reference_types,
+)
+from roof_reference_retrieval import (
+    NORMALIZED_IMAGE_SIZE,
+    find_known_building_match,
+    normalized_roof_image,
+    rank_references,
+    retrieve_reference_bundle,
 )
 
 
@@ -92,11 +101,12 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
         with patch.dict(os.environ, {ROOF_REFERENCE_FEATURE_ENV: "true"}, clear=False):
             self.assertTrue(roof_reference_feature_enabled(False))
 
-    def test_all_reference_images_are_the_production_default(self) -> None:
+    def test_retrieval_limits_have_bounded_production_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            self.assertIsNone(reference_images_per_type())
+            self.assertEqual(reference_images_per_type(), 2)
+            self.assertEqual(maximum_retrieved_reference_images(), 8)
         with patch.dict(os.environ, {"ROOF_REFERENCE_IMAGES_PER_TYPE": "all"}, clear=True):
-            self.assertIsNone(reference_images_per_type())
+            self.assertEqual(reference_images_per_type(), 1000)
         with patch.dict(os.environ, {"ROOF_REFERENCE_IMAGES_PER_TYPE": "3"}, clear=True):
             self.assertEqual(reference_images_per_type(), 3)
 
@@ -340,6 +350,72 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertEqual(trace["stage1"], self.stage1)
         self.assertEqual(len(trace["manifest"]["sha256"]), 64)
 
+    def test_known_building_requires_parcel_source_and_image_date(self) -> None:
+        row = {
+            "Parcel Number": "0533100022000",
+            "Primary Aerial Source": "Esri World Imagery",
+            "Primary Aerial Photo Date": "2025-09-06",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "mod_bit")
+        self.assertEqual(match.reference.path.name, "aging_002.png")
+        changed_date = dict(row, **{"Primary Aerial Photo Date": "2025-09-07"})
+        self.assertIsNone(find_known_building_match(changed_date, self.config))
+
+    def test_normalized_crop_and_top_reference_retrieval(self) -> None:
+        target = Path(
+            "aerial_images_single_address/world_imagery/"
+            "0533100022000-world_imagery-ai-target.png"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_dir = Path(temp_dir)
+            normalized = normalized_roof_image(target, cache_dir=cache_dir)
+            from PIL import Image
+
+            with Image.open(normalized) as image:
+                self.assertEqual(image.size, (NORMALIZED_IMAGE_SIZE, NORMALIZED_IMAGE_SIZE))
+            _, ranked = rank_references(
+                list(self.config.roof_types),
+                self.config,
+                target,
+                cache_dir=cache_dir,
+            )
+        self.assertEqual(ranked[0].roof_type, "mod_bit")
+        self.assertEqual(ranked[0].reference.path.name, "aging_002.png")
+
+    def test_retrieval_bundle_is_balanced_and_bounded(self) -> None:
+        target = Path(
+            "aerial_images_single_address/world_imagery/"
+            "0533100022000-world_imagery-ai-target.png"
+        )
+        row = {
+            "Parcel Number": "0533100022000",
+            "Primary Aerial Source": "Esri World Imagery",
+            "Primary Aerial Photo Date": "2025-09-06",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _, bundle = retrieve_reference_bundle(
+                list(self.config.roof_types),
+                self.config,
+                target,
+                known_match=find_known_building_match(row, self.config),
+                max_images=8,
+                images_per_type=2,
+                cache_dir=Path(temp_dir),
+            )
+        self.assertLessEqual(sum(len(item.image_paths) for item in bundle), 8)
+        self.assertTrue(all(len(item.image_paths) <= 2 for item in bundle))
+        sources = [path.name for item in bundle for path in item.source_image_paths]
+        self.assertIn("aging_002.png", sources)
+
+    def test_offline_reference_evaluation_guards_corrected_building(self) -> None:
+        result = evaluate()
+        self.assertEqual(result["total_cases"], 1)
+        self.assertEqual(result["classification_accuracy"], 1.0)
+        self.assertEqual(result["known_match_accuracy"], 1.0)
+        self.assertEqual(result["top1_retrieval_accuracy"], 1.0)
+
     def final_analysis(self) -> dict:
         return {
             "best_image_source": "Primary aerial imagery",
@@ -522,6 +598,30 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("tpo", result["reference_workflow"]["selected_reference_types"])
         self.assertNotIn("pvc", result["reference_workflow"]["selected_reference_types"])
         self.assertEqual(result["usage"]["total_tokens"], 470)
+
+    def test_openai_known_building_skips_material_inference_and_locks_type(self) -> None:
+        row = {
+            "Parcel Number": "0533100022000",
+            "Primary Aerial Source": "Esri World Imagery",
+            "Primary Aerial Photo Date": "2025-09-06",
+        }
+        target = Path(
+            "aerial_images_single_address/world_imagery/"
+            "0533100022000-world_imagery-ai-target.png"
+        )
+        stage2_response = {
+            "usage": {"input_tokens": 300, "output_tokens": 50, "total_tokens": 350}
+        }
+        with patch(
+            "generate_roof_intelligence_reports.call_openai_structured",
+            return_value=(self.final_analysis(), stage2_response),
+        ) as api_call:
+            result = call_openai_reference_analysis(row, target, "test-model")
+        self.assertEqual(api_call.call_count, 1)
+        self.assertEqual(result["roof_zones"][0]["roof_type"], "mod_bit")
+        self.assertEqual(result["roof_zones"][0]["confidence"], 100)
+        self.assertTrue(result["reference_workflow"]["known_building_match"]["matched"])
+        self.assertEqual(result["usage"]["total_tokens"], 350)
 
     def test_gemini_two_stage_orchestration_records_trace(self) -> None:
         stage1_response = {"usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 20, "totalTokenCount": 120}}

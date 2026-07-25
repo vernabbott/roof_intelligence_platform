@@ -52,6 +52,15 @@ from roof_reference_config import (
     roof_reference_trace,
     select_reference_types,
 )
+from roof_reference_retrieval import (
+    DEFAULT_IMAGES_PER_TYPE,
+    DEFAULT_MAX_REFERENCE_IMAGES,
+    KnownBuildingMatch,
+    find_known_building_match,
+    known_building_stage1,
+    lock_known_building_material,
+    retrieve_reference_bundle,
+)
 
 
 PAGE_W = 1700
@@ -790,13 +799,17 @@ def reference_analysis_prompt(
     return (
         analysis_prompt(row)
         + " This is Stage 2 of the roof-reference workflow. Reassess the target building image using the candidate "
-        "analysis, selected identification guides, and labeled positive reference images supplied after this text. "
+        "analysis, selected identification guides, and similarity-ranked positive reference images supplied after this text. "
+        "The images are normalized to the same square roof-focused format. "
         "Compare the target against every supplied reference image, not only the first examples. First check whether a "
         "reference depicts the same building and roof geometry as the target. A reviewer-confirmed same-building match "
         "is strong roof-type evidence when the visible roof surface and layout have not materially changed; do not "
         "override that evidence with a generic color prior. If the target appears reroofed or materially changed, explain "
         "the visible change instead. Name any same-building or especially strong matching reference filename in the "
         "zone's supporting_cues so the comparison is auditable. "
+        "If Stage 1 contains known_building_match.material_locked=true, the reviewer-confirmed roof_type is ground truth "
+        "for this exact parcel, imagery source, and imagery date. Do not change or broaden that material label; use the "
+        "image analysis only for condition, physical structure, visible risks, and limitations. "
         "Reference examples are comparisons, not templates: do not classify from color, building shape, or superficial "
         "image similarity alone. Keep visibly distinct roof zones separate, including a small attached section whose "
         "texture or seam pattern differs from the dominant roof. Use estimated_area_percentage=0 if an area share cannot "
@@ -855,13 +868,26 @@ def build_openai_reference_content(
                 "text": f"IDENTIFICATION GUIDE — {item.label} ({relative_project_path(item.guide_path)}):\n{item.guide_text}",
             }
         )
-        for image_path in item.image_paths:
+        for index, image_path in enumerate(item.image_paths):
+            source_path = (
+                item.source_image_paths[index]
+                if index < len(item.source_image_paths)
+                else image_path
+            )
+            similarity = (
+                item.similarity_scores[index]
+                if index < len(item.similarity_scores)
+                else None
+            )
+            similarity_label = (
+                f" — similarity {similarity:.3f}" if similarity is not None else ""
+            )
             content.append(
                 {
                     "type": "input_text",
                     "text": (
                         f"REVIEWER-CONFIRMED POSITIVE {item.label} REFERENCE IMAGE — "
-                        f"{relative_project_path(image_path)}:"
+                        f"{relative_project_path(source_path)}{similarity_label}:"
                     ),
                 }
             )
@@ -908,12 +934,25 @@ def build_gemini_reference_parts(
                 "text": f"IDENTIFICATION GUIDE — {item.label} ({relative_project_path(item.guide_path)}):\n{item.guide_text}"
             }
         )
-        for image_path in item.image_paths:
+        for index, image_path in enumerate(item.image_paths):
+            source_path = (
+                item.source_image_paths[index]
+                if index < len(item.source_image_paths)
+                else image_path
+            )
+            similarity = (
+                item.similarity_scores[index]
+                if index < len(item.similarity_scores)
+                else None
+            )
+            similarity_label = (
+                f" — similarity {similarity:.3f}" if similarity is not None else ""
+            )
             parts.append(
                 {
                     "text": (
                         f"REVIEWER-CONFIRMED POSITIVE {item.label} REFERENCE IMAGE — "
-                        f"{relative_project_path(image_path)}:"
+                        f"{relative_project_path(source_path)}{similarity_label}:"
                     )
                 }
             )
@@ -1038,16 +1077,31 @@ def call_openai_structured(
     return json.loads(text), data
 
 
-def reference_images_per_type() -> int | None:
+def reference_images_per_type() -> int:
     raw = os.environ.get("ROOF_REFERENCE_IMAGES_PER_TYPE")
-    if raw is None or not raw.strip() or raw.strip().lower() in {"all", "unlimited", "0"}:
-        return None
+    if raw is None or not raw.strip():
+        return DEFAULT_IMAGES_PER_TYPE
+    if raw.strip().lower() in {"all", "unlimited"}:
+        return 1000
     try:
         value = int(raw)
     except ValueError as exc:
         raise RuntimeError("ROOF_REFERENCE_IMAGES_PER_TYPE must be a positive integer or 'all'") from exc
     if value < 1:
         raise RuntimeError("ROOF_REFERENCE_IMAGES_PER_TYPE must be a positive integer or 'all'")
+    return value
+
+
+def maximum_retrieved_reference_images() -> int:
+    raw = os.environ.get("ROOF_REFERENCE_MAX_RETRIEVED_IMAGES")
+    if raw is None or not raw.strip():
+        return DEFAULT_MAX_REFERENCE_IMAGES
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("ROOF_REFERENCE_MAX_RETRIEVED_IMAGES must be a positive integer") from exc
+    if value < 1:
+        raise RuntimeError("ROOF_REFERENCE_MAX_RETRIEVED_IMAGES must be a positive integer")
     return value
 
 
@@ -1131,24 +1185,38 @@ def normalize_reference_analysis(analysis: dict) -> None:
 
 def call_openai_reference_analysis(row: dict, target_path: Path, model: str) -> dict:
     config = load_roof_reference_config()
-    stage1, stage1_response = call_openai_structured(
-        build_openai_candidate_content(row, target_path, config),
-        model,
-        roof_candidate_schema(config),
-        "roof_candidate_classification",
-        1400,
-    )
-    validate_candidate_analysis(stage1)
+    known_match = find_known_building_match(row, config)
+    if known_match:
+        stage1 = known_building_stage1(known_match)
+        stage1_response = {}
+    else:
+        stage1, stage1_response = call_openai_structured(
+            build_openai_candidate_content(row, target_path, config),
+            model,
+            roof_candidate_schema(config),
+            "roof_candidate_classification",
+            1400,
+        )
+        validate_candidate_analysis(stage1)
     selected = select_reference_types(stage1, config)
-    bundle = load_reference_bundle(selected, config, reference_images_per_type())
+    normalized_target, bundle = retrieve_reference_bundle(
+        selected,
+        config,
+        target_path,
+        known_match=known_match,
+        max_images=maximum_retrieved_reference_images(),
+        images_per_type=reference_images_per_type(),
+    )
     analysis, stage2_response = call_openai_structured(
-        build_openai_reference_content(row, target_path, stage1, bundle, config),
+        build_openai_reference_content(row, normalized_target, stage1, bundle, config),
         model,
         reference_analysis_schema(),
         "roof_reference_analysis",
         2800,
     )
     validate_reference_analysis(analysis)
+    if known_match:
+        lock_known_building_material(analysis, known_match)
     normalize_reference_analysis(analysis)
     stage1_usage = openai_usage_summary(stage1_response)
     stage2_usage = openai_usage_summary(stage2_response)
@@ -1160,6 +1228,8 @@ def call_openai_reference_analysis(row: dict, target_path: Path, model: str) -> 
         stage1,
         "openai",
         model,
+        known_building_match=known_match.as_trace() if known_match else None,
+        normalized_target_path=normalized_target,
     )
     return analysis
 
@@ -1355,20 +1425,34 @@ def gemini_usage_summary(response: dict) -> dict:
 
 def call_gemini_reference_analysis(row: dict, target_path: Path, model: str) -> dict:
     config = load_roof_reference_config()
-    stage1, stage1_response = call_gemini_structured(
-        build_gemini_candidate_parts(row, target_path, config),
-        model,
-        1400,
-    )
-    validate_candidate_analysis(stage1)
+    known_match = find_known_building_match(row, config)
+    if known_match:
+        stage1 = known_building_stage1(known_match)
+        stage1_response = {}
+    else:
+        stage1, stage1_response = call_gemini_structured(
+            build_gemini_candidate_parts(row, target_path, config),
+            model,
+            1400,
+        )
+        validate_candidate_analysis(stage1)
     selected = select_reference_types(stage1, config)
-    bundle = load_reference_bundle(selected, config, reference_images_per_type())
+    normalized_target, bundle = retrieve_reference_bundle(
+        selected,
+        config,
+        target_path,
+        known_match=known_match,
+        max_images=maximum_retrieved_reference_images(),
+        images_per_type=reference_images_per_type(),
+    )
     analysis, stage2_response = call_gemini_structured(
-        build_gemini_reference_parts(row, target_path, stage1, bundle, config),
+        build_gemini_reference_parts(row, normalized_target, stage1, bundle, config),
         model,
         2800,
     )
     validate_reference_analysis(analysis)
+    if known_match:
+        lock_known_building_material(analysis, known_match)
     normalize_reference_analysis(analysis)
     stage1_usage = gemini_usage_summary(stage1_response)
     stage2_usage = gemini_usage_summary(stage2_response)
@@ -1380,6 +1464,8 @@ def call_gemini_reference_analysis(row: dict, target_path: Path, model: str) -> 
         stage1,
         "gemini",
         model,
+        known_building_match=known_match.as_trace() if known_match else None,
+        normalized_target_path=normalized_target,
     )
     return analysis
 

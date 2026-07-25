@@ -23,12 +23,33 @@ class RoofReferenceConfigurationError(ValueError):
 
 
 @dataclass(frozen=True)
+class RoofReferenceIdentity:
+    parcel_id: str
+    image_source: str
+    image_date: str
+
+
+@dataclass(frozen=True)
+class RoofReferenceImage:
+    path: Path
+    crop_box: tuple[float, float, float, float] | None
+    known_buildings: tuple[RoofReferenceIdentity, ...]
+    cues: tuple[str, ...]
+    condition_tags: tuple[str, ...]
+    reviewer_confirmed: bool
+
+
+@dataclass(frozen=True)
 class RoofReferenceType:
     key: str
     label: str
     aliases: tuple[str, ...]
     guide_path: Path
-    reference_image_paths: tuple[Path, ...]
+    reference_images: tuple[RoofReferenceImage, ...]
+
+    @property
+    def reference_image_paths(self) -> tuple[Path, ...]:
+        return tuple(image.path for image in self.reference_images)
 
 
 @dataclass(frozen=True)
@@ -48,6 +69,8 @@ class LoadedRoofReference:
     guide_path: Path
     guide_text: str
     image_paths: tuple[Path, ...]
+    source_image_paths: tuple[Path, ...] = ()
+    similarity_scores: tuple[float, ...] = ()
 
 
 def _mapping(value: Any, location: str) -> dict:
@@ -115,6 +138,73 @@ def _linked_markdown_images(path: Path, project_root: Path) -> tuple[Path, ...]:
     return tuple(linked)
 
 
+def _reference_image(
+    value: object,
+    location: str,
+    project_root: Path,
+) -> RoofReferenceImage:
+    if isinstance(value, str):
+        path_value = value
+        metadata: dict[str, Any] = {}
+    else:
+        metadata = _mapping(value, location)
+        path_value = metadata.get("path")
+    path = _project_path(path_value, f"{location}.path", project_root)
+
+    raw_crop = metadata.get("crop_box")
+    crop_box = None
+    if raw_crop is not None:
+        if (
+            not isinstance(raw_crop, list)
+            or len(raw_crop) != 4
+            or any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in raw_crop)
+        ):
+            raise RoofReferenceConfigurationError(f"{location}.crop_box must contain four numbers")
+        crop_box = tuple(float(item) for item in raw_crop)
+        left, top, right, bottom = crop_box
+        if not (0 <= left < right <= 1 and 0 <= top < bottom <= 1):
+            raise RoofReferenceConfigurationError(
+                f"{location}.crop_box must be normalized [left, top, right, bottom] coordinates"
+            )
+
+    raw_identities = metadata.get("known_buildings") or []
+    if not isinstance(raw_identities, list):
+        raise RoofReferenceConfigurationError(f"{location}.known_buildings must be a YAML list")
+    identities: list[RoofReferenceIdentity] = []
+    for index, raw_identity in enumerate(raw_identities):
+        identity_location = f"{location}.known_buildings[{index}]"
+        identity = _mapping(raw_identity, identity_location)
+        identities.append(
+            RoofReferenceIdentity(
+                parcel_id=_text(identity.get("parcel_id"), f"{identity_location}.parcel_id"),
+                image_source=_text(identity.get("image_source"), f"{identity_location}.image_source"),
+                image_date=_text(identity.get("image_date"), f"{identity_location}.image_date"),
+            )
+        )
+
+    cues = _text_list(metadata.get("cues") or [], f"{location}.cues", allow_empty=True)
+    condition_tags = _text_list(
+        metadata.get("condition_tags") or [],
+        f"{location}.condition_tags",
+        allow_empty=True,
+    )
+    reviewer_confirmed = metadata.get("reviewer_confirmed", bool(identities))
+    if not isinstance(reviewer_confirmed, bool):
+        raise RoofReferenceConfigurationError(f"{location}.reviewer_confirmed must be true or false")
+    if identities and not reviewer_confirmed:
+        raise RoofReferenceConfigurationError(
+            f"{location} cannot register known_buildings without reviewer_confirmed: true"
+        )
+    return RoofReferenceImage(
+        path=path,
+        crop_box=crop_box,
+        known_buildings=tuple(identities),
+        cues=cues,
+        condition_tags=condition_tags,
+        reviewer_confirmed=reviewer_confirmed,
+    )
+
+
 def load_roof_reference_config(
     manifest_path: str | Path = DEFAULT_ROOF_REFERENCE_MANIFEST_PATH,
     project_root: str | Path = PROJECT_ROOT,
@@ -128,8 +218,8 @@ def load_roof_reference_config(
     except yaml.YAMLError as exc:
         raise RoofReferenceConfigurationError(f"Invalid roof reference manifest YAML: {exc}") from exc
 
-    if raw.get("schema_version") != 1:
-        raise RoofReferenceConfigurationError("roof reference manifest schema_version must be 1")
+    if raw.get("schema_version") not in {1, 2}:
+        raise RoofReferenceConfigurationError("roof reference manifest schema_version must be 1 or 2")
     workflow_version = _text(raw.get("workflow_version"), "workflow_version")
     classification_guide_path = _project_path(raw.get("classification_guide"), "classification_guide", root)
     _require_active_markdown(classification_guide_path)
@@ -151,14 +241,18 @@ def load_roof_reference_config(
             continue
         guide_path = _project_path(item.get("guide"), f"roof_types.{key}.guide", root)
         _require_active_markdown(guide_path)
-        reference_paths = tuple(
-            _project_path(value, f"roof_types.{key}.reference_images[{index}]", root)
-            for index, value in enumerate(_text_list(item.get("reference_images"), f"roof_types.{key}.reference_images"))
+        raw_reference_images = item.get("reference_images")
+        if not isinstance(raw_reference_images, list) or not raw_reference_images:
+            raise RoofReferenceConfigurationError(f"roof_types.{key}.reference_images must be a non-empty YAML list")
+        reference_images = tuple(
+            _reference_image(value, f"roof_types.{key}.reference_images[{index}]", root)
+            for index, value in enumerate(raw_reference_images)
         )
+        reference_paths = tuple(image.path for image in reference_images)
         if "stage2_images" in item:
             raise RoofReferenceConfigurationError(
-                f"roof_types.{key}.stage2_images is obsolete; every approved reference_images entry "
-                "is automatically used in Stage 2"
+                f"roof_types.{key}.stage2_images is obsolete; all approved reference_images entries "
+                "are eligible for Stage 2 retrieval"
             )
         if len(set(reference_paths)) != len(reference_paths):
             raise RoofReferenceConfigurationError(f"roof_types.{key}.reference_images contains duplicates")
@@ -183,7 +277,7 @@ def load_roof_reference_config(
             label=_text(item.get("label"), f"roof_types.{key}.label"),
             aliases=_text_list(item.get("aliases") or [], f"roof_types.{key}.aliases", allow_empty=True),
             guide_path=guide_path,
-            reference_image_paths=reference_paths,
+            reference_images=reference_images,
         )
 
     if not roof_types:
@@ -350,6 +444,7 @@ def load_reference_bundle(
                 guide_path=item.guide_path,
                 guide_text=item.guide_path.read_text(encoding="utf-8"),
                 image_paths=item.reference_image_paths[:limit],
+                source_image_paths=item.reference_image_paths[:limit],
             )
         )
     return bundle
@@ -377,18 +472,40 @@ def roof_reference_trace(
     provider: str,
     model: str,
     status: str = "completed",
+    known_building_match: dict | None = None,
+    normalized_target_path: Path | None = None,
 ) -> dict:
     image_coverage = []
+    retrieval = []
     for loaded in bundle:
         approved = config.roof_types[loaded.key].reference_image_paths
+        used_sources = loaded.source_image_paths or loaded.image_paths
         image_coverage.append(
             {
                 "roof_type": loaded.key,
                 "approved_count": len(approved),
-                "used_count": len(loaded.image_paths),
-                "complete": loaded.image_paths == approved,
+                "used_count": len(used_sources),
+                "complete": used_sources == approved,
             }
         )
+        for index, source_path in enumerate(used_sources):
+            retrieval.append(
+                {
+                    "roof_type": loaded.key,
+                    "source_image": relative_project_path(source_path),
+                    "normalized_image": relative_project_path(loaded.image_paths[index]),
+                    "similarity": (
+                        loaded.similarity_scores[index]
+                        if index < len(loaded.similarity_scores)
+                        else None
+                    ),
+                }
+            )
+    source_paths = [
+        path
+        for item in bundle
+        for path in (item.source_image_paths or item.image_paths)
+    ]
     return {
         "enabled": True,
         "status": status,
@@ -398,8 +515,16 @@ def roof_reference_trace(
         "manifest": file_fingerprint(config.manifest_path),
         "classification_guide": file_fingerprint(config.classification_guide_path),
         "guides": [file_fingerprint(item.guide_path) for item in bundle],
-        "reference_images": [file_fingerprint(path) for item in bundle for path in item.image_paths],
+        "reference_images": [file_fingerprint(path) for path in source_paths],
+        "normalized_reference_images": [
+            file_fingerprint(path) for item in bundle for path in item.image_paths
+        ],
         "reference_image_coverage": image_coverage,
+        "retrieval": retrieval,
+        "normalized_target_image": (
+            file_fingerprint(normalized_target_path) if normalized_target_path else None
+        ),
+        "known_building_match": known_building_match or {"matched": False},
         "stage1": stage1,
         "selected_reference_types": [item.key for item in bundle],
     }
