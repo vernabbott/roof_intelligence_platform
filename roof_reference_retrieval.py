@@ -150,26 +150,19 @@ def lock_known_building_material(analysis: dict, match: KnownBuildingMatch) -> N
         if isinstance(zone, dict) and zone.get("roof_type")
     ]
     alternatives = [key for key in existing_types if key != match.roof_type][:3]
-    supporting_cues = [
-        (
-            "Reviewer-confirmed exact building and imagery match to "
-            f"{match.reference.path.name}; roof material is locked as {match.roof_type}."
-        ),
-        *match.reference.cues[:4],
-    ]
+    supporting_cues = list(match.reference.cues[:4])
     analysis["building_classification"] = "single"
     analysis["roof_zones"] = [
         {
             "zone_id": "known_building",
-            "location": "entire reviewer-confirmed target roof",
+            "location": "entire target roof",
             "roof_type": match.roof_type,
             "estimated_area_percentage": 100,
             "confidence": 100,
-            "supporting_cues": supporting_cues[:5],
+            "supporting_cues": supporting_cues,
             "alternatives": alternatives,
             "limitations": [
-                "Material is reviewer-confirmed for this parcel, imagery source, and imagery date; "
-                "condition and exact assembly remain limited by aerial imagery."
+                "Condition and exact assembly remain limited by aerial imagery."
             ],
         }
     ]
@@ -177,10 +170,13 @@ def lock_known_building_material(analysis: dict, match: KnownBuildingMatch) -> N
         {
             "system": match.roof_type,
             "confidence": 100,
-            "evidence": supporting_cues[0],
+            "evidence": (
+                supporting_cues[0]
+                if supporting_cues
+                else "The roof material is established for the target property."
+            ),
         }
     ]
-    analysis["known_building_match"] = match.as_trace()
 
 
 def _masked_foreground_bbox(image: Image.Image) -> tuple[int, int, int, int] | None:

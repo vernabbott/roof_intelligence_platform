@@ -15,6 +15,7 @@ from report_summary_config import (
     finalize_narrative,
     load_report_summary_config,
 )
+from roof_assessment import build_consistent_summary, canonical_observations
 
 
 class ReportSummaryConfigurationTests(unittest.TestCase):
@@ -81,6 +82,49 @@ class ReportSummaryConfigurationTests(unittest.TestCase):
         self.assertIn(REPORT_SUMMARY_CONFIG.ai_guidance, prompt)
         self.assertIn("tree_proximity to confirmed only", prompt)
         self.assertIn("Do not infer trees from shadows", prompt)
+        self.assertIn("Never mention AI, workflow stages, reviewer confirmation", prompt)
+
+    def test_customer_narratives_exclude_reference_matching_process(self) -> None:
+        analysis = {
+            "roof_type": "Primary: Modified Bitumen",
+            "roof_zones": [
+                {
+                    "roof_type": "mod_bit",
+                    "location": "entire reviewer-confirmed target roof",
+                    "estimated_area_percentage": 100,
+                    "supporting_cues": [
+                        "Reviewer-confirmed exact building match to aging_002.png.",
+                        "Weathered asphaltic field with narrow roll-lap geometry.",
+                    ],
+                }
+            ],
+            "observations": [
+                "The reference image matched the parcel and imagery source.",
+                "Localized patching and surface wear are visible.",
+            ],
+            "overall_score": 58,
+            "condition_label": "POOR",
+            "risk_level": "HIGH",
+            "visual_risk_factors": {
+                "dark_staining_or_discoloration": True,
+                "suspected_ponding": False,
+                "high_penetration_density": False,
+                "overhanging_trees_or_debris": False,
+                "tree_proximity": "indeterminate",
+            },
+        }
+
+        observations = canonical_observations(analysis)
+        analysis["observations"] = observations
+        summary = build_consistent_summary(analysis)
+        customer_text = " ".join(observations + [summary]).lower()
+
+        self.assertIn("modified bitumen", customer_text)
+        self.assertIn("weathered asphaltic field", customer_text)
+        self.assertIn("poor condition", summary.lower())
+        for process_term in ("reference", "match", "reviewer", "parcel", "aging_002.png"):
+            self.assertNotIn(process_term, customer_text)
+        self.assertNotIn("Localized patching and surface wear are visible.", summary)
 
     def test_post_processing_adds_configured_contractor_direction(self) -> None:
         analysis = {

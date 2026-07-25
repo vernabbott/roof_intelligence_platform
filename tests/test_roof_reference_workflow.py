@@ -578,7 +578,8 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertTrue(
             any("White Single-Ply or Coated Roof" in item for item in synchronized["observations"])
         )
-        self.assertIn(expected_type, synchronized["summary"])
+        self.assertIn("Ballasted or Tar and Gravel", synchronized["summary"])
+        self.assertIn("White Single-Ply or Coated Roof", synchronized["summary"])
         self.assertIn(
             f"{synchronized['overall_score']}/100",
             synchronized["summary"],
@@ -622,6 +623,10 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertEqual(result["roof_zones"][0]["confidence"], 100)
         self.assertTrue(result["reference_workflow"]["known_building_match"]["matched"])
         self.assertEqual(result["usage"]["total_tokens"], 350)
+        customer_text = " ".join(result["observations"]).lower()
+        for process_term in ("reference", "match", "reviewer", "aging_002.png"):
+            self.assertNotIn(process_term, customer_text)
+        self.assertIn("modified bitumen", customer_text)
 
     def test_gemini_two_stage_orchestration_records_trace(self) -> None:
         stage1_response = {"usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 20, "totalTokenCount": 120}}

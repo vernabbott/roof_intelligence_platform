@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import Mapping
 
 from report_summary_config import REPORT_SUMMARY_CONFIG, append_with_limit, finalize_narrative
@@ -38,6 +39,20 @@ DEBRIS_TERMS = (
     "visible debris",
     "leaf accumulation",
     "leaves on the roof",
+)
+CUSTOMER_NARRATIVE_PROCESS_TERMS = (
+    "reference image",
+    "reference file",
+    "reviewer-confirmed",
+    "reviewer confirmed",
+    "same-building match",
+    "known-building match",
+    "known building match",
+    "matched on parcel",
+    "imagery source",
+    "material label is locked",
+    "ground truth",
+    "roof-reference workflow",
 )
 
 
@@ -75,6 +90,23 @@ def _sentence(value: object) -> str:
         return ""
     terminal_text = text.rstrip("\"')]}”’")
     return text if terminal_text and terminal_text[-1] in ".!?" else text + "."
+
+
+def _customer_observation(value: object) -> str:
+    """Return roof facts while excluding internal identification-process prose."""
+    text = _text(value)
+    lowered = text.lower()
+    if not text or any(term in lowered for term in CUSTOMER_NARRATIVE_PROCESS_TERMS):
+        return ""
+    if any(extension in lowered for extension in (".jpg", ".jpeg", ".png", ".webp")):
+        return ""
+    text = re.sub(
+        r"^(?:the\s+)?(?:aerial\s+)?imagery\s+(?:shows|indicates|reveals)\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return _sentence(text)
 
 
 def _score(value: object, default: int = 0) -> int:
@@ -191,9 +223,9 @@ def canonical_observations(analysis: dict, maximum: int = 5) -> list[str]:
     zones = analysis.get("roof_zones")
     if not isinstance(zones, list) or not zones:
         return [
-            _sentence(item)
+            _customer_observation(item)
             for item in analysis.get("observations") or []
-            if _sentence(item)
+            if _customer_observation(item)
         ][:maximum]
 
     result: list[str] = []
@@ -204,16 +236,18 @@ def canonical_observations(analysis: dict, maximum: int = 5) -> list[str]:
     ):
         material = ROOF_TYPE_LABELS.get(_text(zone.get("roof_type")).lower())
         location = _text(zone.get("location")) or "Target roof area"
+        if "reviewer" in location.lower() or "match" in location.lower():
+            location = "Target roof area"
         cues = [
             _text(cue).rstrip(".")
             for cue in zone.get("supporting_cues") or []
-            if _text(cue)
+            if _customer_observation(cue)
         ][:2]
         if not material:
             continue
-        finding = f"{location}: assessed as {material}"
+        finding = f"{location}: {material} roofing is present"
         if cues:
-            finding += ", supported by " + "; ".join(cue.lower() for cue in cues)
+            finding += ", with " + "; ".join(cue.lower() for cue in cues)
         result.append(_sentence(finding))
         if len(result) >= maximum:
             return result
@@ -221,14 +255,14 @@ def canonical_observations(analysis: dict, maximum: int = 5) -> list[str]:
     factors = analysis.get("visual_risk_factors")
     if isinstance(factors, Mapping):
         for note in factors.get("notes") or []:
-            sentence = _sentence(note)
+            sentence = _customer_observation(note)
             if sentence and sentence not in result:
                 result.append(sentence)
             if len(result) >= maximum:
                 return result
 
     for item in analysis.get("observations") or []:
-        sentence = _sentence(item)
+        sentence = _customer_observation(item)
         if sentence and sentence not in result:
             result.append(sentence)
         if len(result) >= maximum:
@@ -273,25 +307,42 @@ def build_consistent_summary(
     score = _score(analysis.get("overall_score"))
     condition = _text(analysis.get("condition_label")) or condition_label_for_score(score)
     risk = _text(analysis.get("risk_level")) or risk_level_for_score(score)
-    date_text = formatted_capture_date(capture_date)
-
-    if date_text:
-        summary = (
-            f"Aerial imagery dated {date_text} identifies the target roof materials as "
-            f"{material}."
-        )
+    if material.lower().startswith("primary:"):
+        material_details = material.split(":", 1)[1].strip()
+        if "; Secondary:" in material_details:
+            primary, secondary = material_details.split("; Secondary:", 1)
+            summary = (
+                f"The roof includes {primary.strip()} and {secondary.strip()} areas "
+                f"and is in {condition.lower()} condition, scoring {score}/100 "
+                f"with {risk.lower()} visible risk."
+            )
+        else:
+            summary = (
+                f"The {material_details} roof is in {condition.lower()} condition, "
+                f"scoring {score}/100 with {risk.lower()} visible risk."
+            )
     else:
-        summary = f"Aerial imagery identifies the target roof materials as {material}."
-    summary = append_with_limit(
-        summary,
-        f"The aerially assessed condition is {condition.lower()} at {score}/100, "
-        f"with {risk.lower()} visible risk.",
-        REPORT_SUMMARY_CONFIG.summary_max_characters,
-    )
-    for observation in analysis.get("observations") or []:
+        summary = (
+            f"The roof is in {condition.lower()} condition, scoring {score}/100 "
+            f"with {risk.lower()} visible risk."
+        )
+    factors = analysis.get("visual_risk_factors")
+    active_labels: list[str] = []
+    if isinstance(factors, Mapping):
+        for key, factor_config in REPORT_SUMMARY_CONFIG.visual_risk_factors.items():
+            if factors.get(key):
+                label = (
+                    factor_config.confirmed_tree_label
+                    if key == "overhanging_trees_or_debris"
+                    and confirmed_tree_proximity(analysis)
+                    and factor_config.confirmed_tree_label
+                    else factor_config.label
+                )
+                active_labels.append(label)
+    if active_labels:
         summary = append_with_limit(
             summary,
-            _sentence(observation),
+            "Principal visible concerns include " + ", ".join(active_labels) + ".",
             REPORT_SUMMARY_CONFIG.summary_max_characters,
         )
     return finalize_narrative(

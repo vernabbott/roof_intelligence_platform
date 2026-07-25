@@ -112,7 +112,7 @@ class RoofIntelligenceSnapshotTests(unittest.TestCase):
 
         self.assertEqual(original["report_fields"]["roof_area_sqft"], 10_000)
         self.assertEqual(original["analysis"]["summary"], original_summary)
-        self.assertIn("Primary: TPO", original_summary)
+        self.assertIn("The TPO roof", original_summary)
         self.assertIn("75/100", original_summary)
         self.assertEqual(revised["revision"]["number"], 2)
         self.assertEqual(revised["revision"]["parent_snapshot_id"], "snapshot-1")
@@ -191,7 +191,7 @@ class RoofIntelligenceSnapshotTests(unittest.TestCase):
 
         self.assertEqual(edited["analysis"]["summary"], "Old manual summary")
         self.assertEqual(refreshed["revision"]["number"], 1)
-        self.assertIn("Primary: TPO", refreshed["analysis"]["summary"])
+        self.assertIn("The TPO roof", refreshed["analysis"]["summary"])
         self.assertIn("75/100", refreshed["analysis"]["summary"])
         self.assertNotIn("Old manual summary", refreshed["analysis"]["summary"])
         self.assertNotIn("New AI summary", refreshed["analysis"]["summary"])
