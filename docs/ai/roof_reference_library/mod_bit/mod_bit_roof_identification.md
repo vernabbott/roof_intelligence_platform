@@ -60,6 +60,16 @@ Confidence increases when one roof zone shows:
 
 ## Common Look-Alikes
 
+### Weathered Ribbed Metal
+
+Weathered or repaired metal can appear gray, patchy, or asphaltic from directly
+overhead. Do not classify that appearance as modified bitumen when dense,
+straight, evenly spaced ribs continue across broad rigid roof planes and align
+with visible slope or drainage direction. Modified-bitumen roll laps are
+low-profile sheet seams and generally do not form a continuous raised-rib field
+across multiple sloped planes. Treat coating wear, rust staining, and repairs as
+condition evidence after identifying the underlying ribbed metal geometry.
+
 ### EPDM
 
 EPDM is often black or dark gray but commonly uses much broader sheets and fewer field seams. Its surface looks smoother and more rubber-like, with tape or adhesive seams and rubber flashing details. At aerial resolution, use the controlled type `epdm_or_mod_bit`, displayed as **EPDM or Modified Bitumen**, if seam frequency and texture are not resolved. Do not guess between the two.

@@ -1,10 +1,11 @@
 schema_version: 2
-workflow_version: "2.0"
+workflow_version: "2.1"
 classification_guide: docs/ai/roof_type_classification.md
 maximum_candidate_types: 5
 
 confusion_groups:
   - [epdm, mod_bit]
+  - [metal, mod_bit]
   - [ballasted, tar_and_gravel]
 
 roof_types:
@@ -63,6 +64,18 @@ roof_types:
       - docs/ai/roof_reference_library/metal/images/metal_005.jpeg
       - docs/ai/roof_reference_library/metal/images/metal_006.jpeg
       - docs/ai/roof_reference_library/metal/images/metal_007.png
+      - path: docs/ai/roof_reference_library/metal/images/metal_008.png
+        reviewer_confirmed: true
+        crop_box: [0.1927, 0.1387, 0.8073, 0.8607]
+        known_buildings:
+          - parcel_id: "197128327001"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - Dense straight parallel ribs continue uniformly across broad rigid roof planes.
+          - Multiple roof sections show consistent drainage slope and crisp plane transitions.
+          - Weathering and repairs interrupt the finish but do not interrupt the manufactured rib geometry.
+        condition_tags: [weathering, coating_wear, repairs]
   mod_bit:
     label: Modified bitumen
     enabled: true

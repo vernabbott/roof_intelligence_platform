@@ -9,3 +9,12 @@ cases:
     expected_roof_type: mod_bit
     expected_known_match: true
     expected_top_reference: docs/ai/roof_reference_library/mod_bit/images/aging_002.png
+  - id: tejon_weathered_ribbed_metal
+    target_image: docs/ai/roof_reference_library/metal/images/metal_008.png
+    property:
+      Parcel Number: "197128327001"
+      Primary Aerial Source: Arapahoe County Aerials
+      Primary Aerial Photo Date: "2024-03-01"
+    expected_roof_type: metal
+    expected_known_match: true
+    expected_top_reference: docs/ai/roof_reference_library/metal/images/metal_008.png

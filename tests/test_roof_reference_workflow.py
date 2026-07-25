@@ -46,7 +46,7 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
     def test_manifest_loads_all_approved_types_and_images(self) -> None:
         config = load_roof_reference_config()
         self.assertEqual(len(config.roof_types), 7)
-        self.assertEqual(sum(len(item.reference_image_paths) for item in config.roof_types.values()), 36)
+        self.assertEqual(sum(len(item.reference_image_paths) for item in config.roof_types.values()), 37)
         for item in config.roof_types.values():
             self.assertTrue(item.guide_path.is_file())
             self.assertFalse(any("damage" in path.name for path in item.reference_image_paths))
@@ -54,6 +54,7 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
         self.assertIn("ballasted_005.jpg", [path.name for path in ballasted.reference_image_paths])
         metal = config.roof_types["metal"]
         self.assertIn("metal_007.png", [path.name for path in metal.reference_image_paths])
+        self.assertIn("metal_008.png", [path.name for path in metal.reference_image_paths])
         mod_bit_bundle = load_reference_bundle(["mod_bit"], config)
         self.assertEqual(mod_bit_bundle[0].image_paths, config.roof_types["mod_bit"].reference_image_paths)
         self.assertIn("aging_002.png", [path.name for path in mod_bit_bundle[0].image_paths])
@@ -176,6 +177,23 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
         selected = select_reference_types(stage1, config)
         self.assertIn("tpo", selected)
         self.assertIn("mod_bit", selected)
+
+    def test_modified_bitumen_candidate_adds_metal_comparison(self) -> None:
+        config = load_roof_reference_config()
+        stage1 = {
+            "roof_zones": [
+                {
+                    "visual_evidence": {
+                        "color_family": "light_gray",
+                        "seam_pattern": "narrow_parallel_lines",
+                    },
+                    "candidates": [{"roof_type": "mod_bit", "confidence": 58}],
+                }
+            ]
+        }
+        selected = select_reference_types(stage1, config)
+        self.assertIn("mod_bit", selected)
+        self.assertIn("metal", selected)
 
 
 class RoofReferenceRequestTests(unittest.TestCase):
@@ -328,6 +346,8 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("use pvc_or_coating", openai_text)
         self.assertIn("Favor pvc_or_coating over TPO", openai_text)
         self.assertIn("tan matte weathered asphaltic field may be modified bitumen", openai_text)
+        self.assertIn("strongly favor metal over modified bitumen", openai_text)
+        self.assertIn("full-field raised-rib pattern", openai_text)
         self.assertIn("Compare the target against every supplied reference image", openai_text)
         self.assertIn("reviewer-confirmed same-building match", openai_text)
         self.assertIn("REVIEWER-CONFIRMED POSITIVE", openai_text)
@@ -411,10 +431,21 @@ class RoofReferenceRequestTests(unittest.TestCase):
 
     def test_offline_reference_evaluation_guards_corrected_building(self) -> None:
         result = evaluate()
-        self.assertEqual(result["total_cases"], 1)
+        self.assertEqual(result["total_cases"], 2)
         self.assertEqual(result["classification_accuracy"], 1.0)
         self.assertEqual(result["known_match_accuracy"], 1.0)
         self.assertEqual(result["top1_retrieval_accuracy"], 1.0)
+
+    def test_tejon_known_building_is_locked_as_metal(self) -> None:
+        row = {
+            "Parcel Number": "197128327001",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "metal")
+        self.assertEqual(match.reference.path.name, "metal_008.png")
 
     def final_analysis(self) -> dict:
         return {

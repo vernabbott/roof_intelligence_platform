@@ -55,8 +55,8 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 | PVC | Bright or uniform white/gray field, broad sheets, smooth thermoplastic appearance | Often indistinguishable from TPO |
 | EPDM | Black or charcoal smooth field, broad sheets, low-profile lap grid, dark flashings | Can resemble smooth modified bitumen or a dark coating |
 | Ballasted | Loose stone or pavers with visible depth and intentional distribution; at lower resolution, a tan or beige mottled field with a lighter/coarser perimeter band | Hidden membrane cannot normally be identified; may resemble gravel BUR or a uniformly coated roof when individual stones are unresolved |
-| Metal | Repeated raised ribs, rigid planes, directional sheen, crisp ridges and edge trim | Membrane attachment rows may resemble ribs at poor resolution |
-| Modified bitumen | Dark or granular field, frequent narrow parallel roll laps, staggered end joints | Can resemble EPDM, smooth BUR, or coated asphalt roofing |
+| Metal | Repeated straight raised ribs, rigid planes, visible slope/drainage direction, directional sheen, crisp ridges and edge trim | Membrane attachment rows may resemble ribs at poor resolution |
+| Modified bitumen | Dark or granular field, low-profile narrow roll laps, staggered end joints, flexible sheet character | Can resemble EPDM, smooth BUR, coated asphalt roofing, or weathered metal when rib height is missed |
 | Tar and gravel/BUR | Fine embedded-looking aggregate, uniform field, no exposed sheet-lap grid | Can be indistinguishable from a loose-ballasted membrane roof |
 | Coating | Roller or spray variation, old seams and repairs showing through, one finish spanning different substrates | New coating can resemble a new single-ply membrane |
 
@@ -69,6 +69,7 @@ Use these as ordered starting probabilities, not absolute rules. Geometry, textu
 - **Black:** strongly favor EPDM when the field is smooth, matte, and membrane-like. Frequent narrow roll laps, granules, or asphaltic texture favor modified bitumen instead. Use `epdm_or_mod_bit` when those distinguishing details are unresolved.
 - **Tan aggregate:** compare ballasted with tar-and-gravel/BUR. A deliberate perimeter band with distinctly larger or differently colored stone strongly favors ballasted. A more uniform fine embedded-looking aggregate field favors tar-and-gravel/BUR. When the perimeter transition, stone size, or embedment is not apparent at the available resolution, use `ballasted_or_tar_and_gravel` rather than forcing either type.
 - **Long parallel raised ridges:** strongly favor metal when the ridges run consistently in one direction and are supported by rigid planes, repeated shadows, or crisp metal edge construction. Low-profile membrane seams without those rigid cues do not establish metal.
+- **Metal versus modified bitumen:** dense straight lines that remain uniformly spaced and continuous across broad rigid roof planes, align with a visible slope or drainage direction, and continue through weathered or repaired areas strongly favor metal. Modified-bitumen roll laps are low-profile sheet seams; they may form narrow parallel bands, but they do not normally create a full-field raised-rib profile across multiple sloped planes. Do not let gray color, coating wear, patching, or surface discoloration override manufactured rib and slope geometry.
 
 ## Required Ambiguity Rules
 
@@ -85,6 +86,7 @@ Use these as ordered starting probabilities, not absolute rules. Geometry, textu
 - Return the canonical type `metal` whenever metal is supported. Describe a subtype such as standing seam, ribbed, or corrugated only in supporting observations, and only when the profile is clearly resolved.
 - Do not classify a dark low-slope zone as metal from faint parallel lines or apparent panel divisions alone. Require clear rigid planes, repeated raised ribs with consistent shadows, or metal edge/ridge detailing. If those cues are unresolved and the surface is plausibly a dark membrane, prefer `epdm`, `mod_bit`, or `epdm_or_mod_bit` with metal retained only as an alternative.
 - In soft overhead imagery, a dense, regular, full-field pattern of narrow parallel panel lines combined with rigid rectangular geometry and crisp perimeter construction may support generic `metal` at low-to-moderate confidence even when rib height and attachment are unresolved. This exception does not support a metal subtype.
+- When a light gray or weathered roof has dense straight full-field ribs plus visible roof-plane slope, compare metal directly against modified bitumen and favor metal unless the lines resolve as low-profile sheet laps. Weathering, repairs, or coating loss are condition findings and must not be used to relabel a visibly ribbed metal substrate as modified bitumen.
 - A dark, flat, matte attached field with broad membrane character and no resolved raised-rib shadows or metal edge construction favors EPDM over metal, even when faint straight lines are present.
 
 ## Mixed-Roof Requirements

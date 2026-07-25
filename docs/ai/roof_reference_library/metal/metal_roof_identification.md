@@ -214,6 +214,20 @@ sections or transitions; they should not be confused with the much finer,
 repetitive metal ribs. Ignore the unrelated neighboring roofs visible beyond
 the target building perimeter.
 
+### Metal Reference 8 — Weathered Ribbed Metal Misread as Modified Bitumen
+
+![Weathered ribbed metal roof with straight continuous ribs](images/metal_008.png)
+
+This reviewer-confirmed metal roof has a light, weathered finish with extensive
+repair and coating wear that can superficially resemble aged modified bitumen.
+The decisive evidence is the dense set of straight, evenly spaced ribs that
+continues across each rigid roof plane. Several sections also show consistent
+slope and drainage direction, crisp plane boundaries, and uninterrupted
+manufactured rib geometry. Modified-bitumen roll laps are low-profile sheet
+seams and do not create this full-field raised-rib pattern across sloped,
+rigidly defined planes. Treat discoloration and repairs as condition evidence,
+not as evidence that the substrate is asphaltic.
+
 ## Recommended AI Output
 
 Return the building classification; separate roof zones and planes; metal subtype when supported; estimated area share; confidence; supporting panel, rib, reflection, and trim cues; plausible alternatives; and image limitations. Never infer metal gauge, alloy, coating specification, attachment, structural capacity, condition, or warranty from aerial appearance alone.
