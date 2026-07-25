@@ -1,5 +1,5 @@
 schema_version: 1
-workflow_version: "1.4"
+workflow_version: "1.6"
 classification_guide: docs/ai/roof_type_classification.md
 maximum_candidate_types: 5
 
@@ -19,10 +19,6 @@ roof_types:
       - docs/ai/roof_reference_library/tpo/images/tpo_003.jpeg
       - docs/ai/roof_reference_library/tpo/images/tpo_004.jpeg
       - docs/ai/roof_reference_library/tpo/images/tpo_004.jpg
-    stage2_images:
-      - docs/ai/roof_reference_library/tpo/images/tpo_003.jpeg
-      - docs/ai/roof_reference_library/tpo/images/tpo_004.jpg
-
   pvc:
     label: PVC
     enabled: true
@@ -33,10 +29,6 @@ roof_types:
       - docs/ai/roof_reference_library/pvc/images/pvc_002.jpeg
       - docs/ai/roof_reference_library/pvc/images/pvc_004.jpeg
       - docs/ai/roof_reference_library/pvc/images/pvc_005.jpeg
-    stage2_images:
-      - docs/ai/roof_reference_library/pvc/images/pvc_001.jpeg
-      - docs/ai/roof_reference_library/pvc/images/pvc_005.jpeg
-
   epdm:
     label: EPDM
     enabled: true
@@ -47,10 +39,6 @@ roof_types:
       - docs/ai/roof_reference_library/epdm/images/epdm_002.JPG
       - docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg
       - docs/ai/roof_reference_library/epdm/images/epdm_004.jpg
-    stage2_images:
-      - docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg
-      - docs/ai/roof_reference_library/epdm/images/epdm_004.jpg
-
   ballasted:
     label: Ballasted roof
     enabled: true
@@ -62,10 +50,6 @@ roof_types:
       - docs/ai/roof_reference_library/ballasted/images/ballasted_003.jpg
       - docs/ai/roof_reference_library/ballasted/images/ballasted_004.jpg
       - docs/ai/roof_reference_library/ballasted/images/ballasted_005.jpg
-    stage2_images:
-      - docs/ai/roof_reference_library/ballasted/images/ballasted_003.jpg
-      - docs/ai/roof_reference_library/ballasted/images/ballasted_005.jpg
-
   metal:
     label: Metal
     enabled: true
@@ -78,10 +62,7 @@ roof_types:
       - docs/ai/roof_reference_library/metal/images/metal_004.jpeg
       - docs/ai/roof_reference_library/metal/images/metal_005.jpeg
       - docs/ai/roof_reference_library/metal/images/metal_006.jpeg
-    stage2_images:
-      - docs/ai/roof_reference_library/metal/images/metal_001.jpeg
-      - docs/ai/roof_reference_library/metal/images/metal_005.jpeg
-
+      - docs/ai/roof_reference_library/metal/images/metal_007.png
   mod_bit:
     label: Modified bitumen
     enabled: true
@@ -92,10 +73,8 @@ roof_types:
       - docs/ai/roof_reference_library/mod_bit/images/mod_bit_002.jpeg
       - docs/ai/roof_reference_library/mod_bit/images/mod_bit_003.jpeg
       - docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg
-    stage2_images:
-      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_001.jpg
-      - docs/ai/roof_reference_library/mod_bit/images/mod_bit_004.jpeg
-
+      - docs/ai/roof_reference_library/mod_bit/images/aging_001.png
+      - docs/ai/roof_reference_library/mod_bit/images/aging_002.png
   tar_and_gravel:
     label: Tar and gravel / BUR
     enabled: true
@@ -105,8 +84,5 @@ roof_types:
       - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_001.jpeg"
       - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_002.jpeg"
       - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_003.jpeg"
-      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_004.jpeg"
-      - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_005.jpeg"
-    stage2_images:
       - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_004.jpeg"
       - "docs/ai/roof_reference_library/tar_and_gravel/images/tar_&_gravel_005.jpeg"

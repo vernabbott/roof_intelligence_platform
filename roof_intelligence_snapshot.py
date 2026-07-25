@@ -1,7 +1,7 @@
 """Pure Report Snapshot v1 creation and manual-revision calculations.
 
-The current report generator does not import this module. It is an isolated
-preparation layer for the future Supabase workflow.
+The generator creates snapshots only when versioned editing is feature-flagged;
+the default report workflow remains unchanged.
 """
 
 from __future__ import annotations
@@ -19,6 +19,8 @@ from roof_replacement_cost_estimator import (
     estimate_roof_coating_cost,
     estimate_roof_replacement_cost,
 )
+from report_summary_config import REPORT_SUMMARY_CONFIG, finalize_narrative
+from roof_assessment import build_consistent_summary, formatted_capture_date
 
 
 SNAPSHOT_SCHEMA_VERSION = 1
@@ -85,6 +87,46 @@ def risk_level_for_score(score: float) -> str:
     return "HIGH"
 
 
+def refresh_recommendation(snapshot: Mapping[str, Any]) -> str:
+    """Create a deterministic recommendation aligned to edited roof facts."""
+    analysis = snapshot.get("analysis") or {}
+    calculations = snapshot.get("calculations") or {}
+    roof_type = _nonempty_text(analysis.get("roof_type") or "the identified roof", "roof_type")
+    roof_system = _nonempty_text(analysis.get("roof_system") or roof_type, "roof_system")
+    recommendation_roof_type = roof_type
+    if recommendation_roof_type.lower().startswith("primary:"):
+        recommendation_roof_type = recommendation_roof_type.split(":", 1)[1].strip()
+    recommendation_roof_type = recommendation_roof_type.replace(
+        "; Secondary:",
+        ", with secondary",
+    )
+    condition = str(calculations.get("condition_label") or "FAIR").strip().lower()
+    score = _number(analysis.get("overall_score"), "roof_condition_score", 0, 100)
+
+    if condition == "good":
+        direction = (
+            "Prioritize preventive maintenance and verify whether a compatible restoration "
+            "coating can extend service life before considering replacement."
+        )
+    elif condition == "fair":
+        direction = (
+            "Evaluate targeted repairs and a compatible restoration coating before committing "
+            "to an overlay or complete replacement."
+        )
+    else:
+        direction = (
+            "Arrange a near-term field assessment and compare necessary repairs, restoration, "
+            "overlay, and replacement based on confirmed substrate and moisture conditions."
+        )
+    return (
+        f"The revised assessment identifies roof type {recommendation_roof_type} and physical configuration "
+        f"{roof_system}, with a condition score "
+        f"of {score:g}/100 ({condition}). {direction} Have a qualified commercial roofing "
+        "contractor verify the assembly, drainage, moisture condition, and manufacturer "
+        "requirements before selecting a scope."
+    )
+
+
 def calculate_report_values(
     roof_area_sqft: object,
     roof_condition_score: object,
@@ -99,6 +141,11 @@ def calculate_report_values(
         confidence_inputs=confidence_inputs,
     ).to_dict()
     coating = estimate_roof_coating_cost(area).to_dict()
+    # Snapshots are persisted as JSON. ``dataclasses.asdict`` preserves the
+    # estimator's tuple here, while a JSON round trip restores it as a list.
+    # Keep calculated values JSON-native so an unchanged stored snapshot
+    # validates identically when it is used as the parent of a revision.
+    coating["warranty_options"] = list(coating["warranty_options"])
     roof_squares = round(int(area) / 100) if area else 0
     return {
         "calculation_version": CALCULATION_VERSION,
@@ -139,6 +186,7 @@ def create_initial_snapshot(
     analysis: Mapping[str, Any],
     imagery: Mapping[str, Any],
     created_by: str | None = None,
+    persistent_square_footage_override: bool = False,
     generated_at: str | None = None,
     snapshot_id: str | None = None,
 ) -> dict[str, Any]:
@@ -147,6 +195,16 @@ def create_initial_snapshot(
     condition_score = analysis.get("overall_score")
     calculations = calculate_report_values(roof_area, condition_score)
     created_at = generated_at or _utc_now()
+    initial_analysis = deepcopy(dict(analysis))
+    initial_analysis["summary"] = build_consistent_summary(
+        initial_analysis,
+        formatted_capture_date(imagery.get("capture_date")),
+    )
+    initial_analysis["recommendation"] = finalize_narrative(
+        initial_analysis.get("recommendation"),
+        REPORT_SUMMARY_CONFIG.recommendation_max_characters,
+        REPORT_SUMMARY_CONFIG.fallback_recommendation,
+    )
     snapshot = {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
         "snapshot_id": snapshot_id or str(uuid.uuid4()),
@@ -162,13 +220,13 @@ def create_initial_snapshot(
         },
         "property": deepcopy(dict(property_data)),
         "report_fields": deepcopy(dict(report_fields)),
-        "analysis": deepcopy(dict(analysis)),
+        "analysis": initial_analysis,
         "imagery": deepcopy(dict(imagery)),
         "calculations": calculations,
         "provenance": {
             "source_refreshed_at": created_at,
             "manual_fields": [],
-            "persistent_square_footage_override": False,
+            "persistent_square_footage_override": bool(persistent_square_footage_override),
         },
     }
     _synchronize_derived_fields(snapshot)
@@ -226,11 +284,31 @@ def create_manual_revision(
         target, target_field = field_targets[field]
         target[target_field] = value
 
+    # Correct malformed inherited AI narratives without changing text that the
+    # user explicitly edited for this revision.
+    if "report_summary" not in edits:
+        analysis["summary"] = finalize_narrative(
+            analysis.get("summary"),
+            REPORT_SUMMARY_CONFIG.summary_max_characters,
+            REPORT_SUMMARY_CONFIG.fallback_summary,
+        )
+    if "recommendation" not in edits:
+        analysis["recommendation"] = finalize_narrative(
+            analysis.get("recommendation"),
+            REPORT_SUMMARY_CONFIG.recommendation_max_characters,
+            REPORT_SUMMARY_CONFIG.fallback_recommendation,
+        )
+
     revised["calculations"] = calculate_report_values(
         report_fields.get("roof_area_sqft"),
         analysis.get("overall_score"),
     )
     _synchronize_derived_fields(revised)
+    if {"roof_type", "roof_condition_score"}.intersection(edits) and "report_summary" not in edits:
+        analysis["summary"] = build_consistent_summary(
+            analysis,
+            formatted_capture_date(revised["imagery"].get("capture_date")),
+        )
 
     recommendation_dependencies = {"roof_type", "roof_system", "roof_condition_score"}
     if recommendation_dependencies.intersection(edits) and "recommendation" not in edits:
@@ -352,7 +430,17 @@ def snapshot_to_renderer_inputs(
     for field, value in aliases.items():
         if value is not None:
             row[field] = value
-    return row, deepcopy(dict(snapshot["analysis"]))
+    analysis = deepcopy(dict(snapshot["analysis"]))
+    manual_fields = snapshot["provenance"].get("manual_fields") or []
+    if "roof_type" in manual_fields:
+        # A manually confirmed roofing-surface statement is authoritative for
+        # this revision and must not be replaced by inherited AI zones.
+        analysis["_manual_roof_type_display"] = analysis.get("roof_type")
+    if "roof_system" in manual_fields:
+        # A manually confirmed physical configuration is authoritative for
+        # this revision.
+        analysis["_manual_roof_system_display"] = analysis.get("roof_system")
+    return row, analysis
 
 
 __all__ = [
@@ -365,6 +453,7 @@ __all__ = [
     "condition_label_for_score",
     "create_initial_snapshot",
     "create_manual_revision",
+    "refresh_recommendation",
     "risk_level_for_score",
     "snapshot_to_renderer_inputs",
     "validate_snapshot",

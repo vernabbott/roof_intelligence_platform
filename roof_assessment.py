@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""Canonical roof-assessment normalization shared by reports and revisions."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Mapping
+
+from report_summary_config import REPORT_SUMMARY_CONFIG, append_with_limit, finalize_narrative
+from roof_information_config import ROOF_TYPE_LABELS
+
+
+ASSESSMENT_SYNC_VERSION = "roof-assessment-v1"
+AMBIGUOUS_WHITE_SINGLE_PLY_KEY = "tpo_pvc_or_coating"
+BREAKDOWN_WEIGHTS = {
+    "Membrane Condition": 0.30,
+    "Ponding": 0.20,
+    "Flashing & Seals": 0.20,
+    "Penetrations": 0.15,
+    "Overall Maintenance": 0.15,
+}
+CONFIRMED_TREE_PHRASES = (
+    "overhanging tree",
+    "overhanging trees",
+    "tree overhang",
+    "tree canopy",
+    "trees closely",
+    "tree immediately adjacent",
+    "trees immediately adjacent",
+    "branches touching",
+    "branches overhang",
+    "branches extending over",
+)
+TREE_TERMS = ("tree", "trees", "branch", "branches", "canopy")
+DEBRIS_TERMS = (
+    "roof debris",
+    "debris accumulation",
+    "visible debris",
+    "leaf accumulation",
+    "leaves on the roof",
+)
+
+
+def _text(value: object) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _capitalize_sentence_starts(text: str) -> str:
+    """Capitalize the first letter at the start of every sentence."""
+    characters = list(text)
+    capitalize_next = True
+    possible_sentence_end = False
+    closing_punctuation = "\"')]}”’"
+
+    for index, character in enumerate(characters):
+        if capitalize_next and character.isalpha():
+            characters[index] = character.upper()
+            capitalize_next = False
+
+        if character in ".!?":
+            possible_sentence_end = True
+        elif possible_sentence_end:
+            if character.isspace():
+                capitalize_next = True
+                possible_sentence_end = False
+            elif character not in closing_punctuation:
+                possible_sentence_end = False
+
+    return "".join(characters)
+
+
+def _sentence(value: object) -> str:
+    text = _capitalize_sentence_starts(_text(value).rstrip())
+    if not text:
+        return ""
+    terminal_text = text.rstrip("\"')]}”’")
+    return text if terminal_text and terminal_text[-1] in ".!?" else text + "."
+
+
+def _score(value: object, default: int = 0) -> int:
+    try:
+        return max(0, min(100, int(round(float(value)))))
+    except (TypeError, ValueError):
+        return default
+
+
+def condition_label_for_score(score: object) -> str:
+    value = _score(score)
+    if value >= 80:
+        return "GOOD"
+    if value >= 60:
+        return "FAIR"
+    return "POOR"
+
+
+def risk_level_for_score(score: object) -> str:
+    value = _score(score)
+    if value >= 80:
+        return "LOW"
+    if value >= 60:
+        return "MODERATE"
+    return "HIGH"
+
+
+def normalize_zone_materials(analysis: dict) -> None:
+    """Use controlled ambiguity when the zone evidence cannot support chemistry."""
+    zones = analysis.get("roof_zones")
+    if not isinstance(zones, list):
+        return
+
+    for zone in zones:
+        if not isinstance(zone, dict):
+            continue
+        key = _text(zone.get("roof_type")).lower()
+        alternatives = {
+            _text(value).lower()
+            for value in zone.get("alternatives") or []
+            if _text(value)
+        }
+        limitations = " ".join(
+            _text(value).lower() for value in zone.get("limitations") or []
+        )
+        confidence = _score(zone.get("confidence"))
+
+        if key in {"pvc", "coating"}:
+            key = "pvc_or_coating"
+        elif key == "tpo":
+            unresolved_white_surface = {"pvc", "coating"}.issubset(alternatives) and (
+                confidence <= 60
+                or any(
+                    phrase in limitations
+                    for phrase in (
+                        "cannot distinguish",
+                        "cannot be separated",
+                        "not resolved",
+                        "not readable",
+                        "unresolved",
+                    )
+                )
+            )
+            if unresolved_white_surface:
+                key = AMBIGUOUS_WHITE_SINGLE_PLY_KEY
+
+        if key in ROOF_TYPE_LABELS:
+            zone["roof_type"] = key
+
+
+def normalize_tree_evidence(analysis: dict) -> None:
+    """Allow tree-impact findings only when nearby trees are explicitly confirmed."""
+    factors = analysis.get("visual_risk_factors")
+    if not isinstance(factors, dict):
+        return
+
+    notes = [_sentence(note) for note in factors.get("notes") or [] if _sentence(note)]
+    observations = [
+        _sentence(item) for item in analysis.get("observations") or [] if _sentence(item)
+    ]
+    evidence_text = " ".join(notes + observations).lower()
+    state = _text(factors.get("tree_proximity")).lower()
+    if state not in {"confirmed", "not_visible", "indeterminate"}:
+        state = (
+            "confirmed"
+            if any(phrase in evidence_text for phrase in CONFIRMED_TREE_PHRASES)
+            else "indeterminate"
+        )
+    factors["tree_proximity"] = state
+
+    if state == "confirmed":
+        return
+
+    factors["notes"] = [
+        note for note in notes if not any(term in note.lower() for term in TREE_TERMS)
+    ]
+    analysis["observations"] = [
+        item
+        for item in observations
+        if not any(term in item.lower() for term in TREE_TERMS)
+    ]
+    has_visible_debris = any(term in evidence_text for term in DEBRIS_TERMS)
+    if not has_visible_debris:
+        factors["overhanging_trees_or_debris"] = False
+
+
+def confirmed_tree_proximity(analysis: Mapping) -> bool:
+    factors = analysis.get("visual_risk_factors")
+    return isinstance(factors, Mapping) and factors.get("tree_proximity") == "confirmed"
+
+
+def canonical_observations(analysis: dict, maximum: int = 5) -> list[str]:
+    """Build the displayed observations from the same zone and risk evidence."""
+    zones = analysis.get("roof_zones")
+    if not isinstance(zones, list) or not zones:
+        return [
+            _sentence(item)
+            for item in analysis.get("observations") or []
+            if _sentence(item)
+        ][:maximum]
+
+    result: list[str] = []
+    for zone in sorted(
+        (item for item in zones if isinstance(item, dict)),
+        key=lambda item: _score(item.get("estimated_area_percentage")),
+        reverse=True,
+    ):
+        material = ROOF_TYPE_LABELS.get(_text(zone.get("roof_type")).lower())
+        location = _text(zone.get("location")) or "Target roof area"
+        cues = [
+            _text(cue).rstrip(".")
+            for cue in zone.get("supporting_cues") or []
+            if _text(cue)
+        ][:2]
+        if not material:
+            continue
+        finding = f"{location}: assessed as {material}"
+        if cues:
+            finding += ", supported by " + "; ".join(cue.lower() for cue in cues)
+        result.append(_sentence(finding))
+        if len(result) >= maximum:
+            return result
+
+    factors = analysis.get("visual_risk_factors")
+    if isinstance(factors, Mapping):
+        for note in factors.get("notes") or []:
+            sentence = _sentence(note)
+            if sentence and sentence not in result:
+                result.append(sentence)
+            if len(result) >= maximum:
+                return result
+
+    for item in analysis.get("observations") or []:
+        sentence = _sentence(item)
+        if sentence and sentence not in result:
+            result.append(sentence)
+        if len(result) >= maximum:
+            break
+    return result
+
+
+def score_from_breakdown(analysis: Mapping) -> int:
+    """Calculate the overall condition score from the five displayed components."""
+    reported = _score(analysis.get("overall_score"), 0)
+    breakdown = analysis.get("breakdown")
+    if not isinstance(breakdown, Mapping):
+        return reported
+    weighted = 0.0
+    total_weight = 0.0
+    for field, weight in BREAKDOWN_WEIGHTS.items():
+        value = breakdown.get(field)
+        if value is None:
+            continue
+        weighted += _score(value, reported) * weight
+        total_weight += weight
+    return _score(weighted / total_weight, reported) if total_weight else reported
+
+
+def formatted_capture_date(value: object) -> str:
+    text = _text(value)
+    digits = "".join(character for character in text if character.isdigit())
+    if len(digits) >= 8:
+        try:
+            return datetime.strptime(digits[:8], "%Y%m%d").strftime("%m/%d/%Y")
+        except ValueError:
+            pass
+    return text
+
+
+def build_consistent_summary(
+    analysis: Mapping,
+    capture_date: object = "",
+) -> str:
+    """Derive the report summary from canonical material, observations, and score."""
+    material = _text(analysis.get("roof_type")) or "Primary: Material not determined"
+    score = _score(analysis.get("overall_score"))
+    condition = _text(analysis.get("condition_label")) or condition_label_for_score(score)
+    risk = _text(analysis.get("risk_level")) or risk_level_for_score(score)
+    date_text = formatted_capture_date(capture_date)
+
+    if date_text:
+        summary = (
+            f"Aerial imagery dated {date_text} identifies the target roof materials as "
+            f"{material}."
+        )
+    else:
+        summary = f"Aerial imagery identifies the target roof materials as {material}."
+    summary = append_with_limit(
+        summary,
+        f"The aerially assessed condition is {condition.lower()} at {score}/100, "
+        f"with {risk.lower()} visible risk.",
+        REPORT_SUMMARY_CONFIG.summary_max_characters,
+    )
+    for observation in analysis.get("observations") or []:
+        summary = append_with_limit(
+            summary,
+            _sentence(observation),
+            REPORT_SUMMARY_CONFIG.summary_max_characters,
+        )
+    return finalize_narrative(
+        summary,
+        REPORT_SUMMARY_CONFIG.summary_max_characters,
+        REPORT_SUMMARY_CONFIG.fallback_summary,
+    )
+
+
+__all__ = [
+    "AMBIGUOUS_WHITE_SINGLE_PLY_KEY",
+    "ASSESSMENT_SYNC_VERSION",
+    "BREAKDOWN_WEIGHTS",
+    "build_consistent_summary",
+    "canonical_observations",
+    "confirmed_tree_proximity",
+    "condition_label_for_score",
+    "formatted_capture_date",
+    "normalize_zone_materials",
+    "normalize_tree_evidence",
+    "risk_level_for_score",
+    "score_from_breakdown",
+]

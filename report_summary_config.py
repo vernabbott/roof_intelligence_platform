@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ class ReportSummaryConfigurationError(ValueError):
 class VisualRiskFactorConfig:
     label: str
     indicators: tuple[str, ...]
+    confirmed_tree_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +106,14 @@ def load_report_summary_config(path: str | Path = DEFAULT_REPORT_SUMMARY_PATH) -
         factors[str(key)] = VisualRiskFactorConfig(
             label=_text(factor.get("label"), f"report_summary.visual_risk.factors.{key}.label"),
             indicators=_text_list(factor.get("indicators"), f"report_summary.visual_risk.factors.{key}.indicators"),
+            confirmed_tree_label=(
+                _text(
+                    factor.get("confirmed_tree_label"),
+                    f"report_summary.visual_risk.factors.{key}.confirmed_tree_label",
+                )
+                if factor.get("confirmed_tree_label") is not None
+                else None
+            ),
         )
 
     required_factors = {
@@ -171,3 +181,49 @@ def append_with_limit(text: str, addition: str, maximum_characters: int) -> str:
             shortened = shortened.rsplit(" ", 1)[0].rstrip(" ,;:") + "."
         base = shortened
     return f"{base} {required}".strip()
+
+
+def finalize_narrative(
+    value: object,
+    maximum_characters: int,
+    fallback: str,
+) -> str:
+    """Return an English report narrative ending at a complete sentence."""
+    raw = " ".join(str(value or "").split())
+    supported: list[str] = []
+    common_punctuation = {"–", "—", "…", "‘", "’", "“", "”", "°"}
+    for character in raw:
+        if character.isascii() or character in common_punctuation:
+            supported.append(character)
+            continue
+        if "LATIN" in unicodedata.name(character, ""):
+            supported.append(character)
+        else:
+            supported.append(" ")
+    text = " ".join("".join(supported).split())[:maximum_characters].strip()
+    if not text:
+        return " ".join(str(fallback or "").split())[:maximum_characters].rstrip()
+    if re.search(r"[.!?][\"'’”)]?$", text):
+        return text
+
+    without_dangling_connector = re.sub(
+        r"(?:[,;:]?\s+)(?:and|or|but|with|including|because|while|which|that)$",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).rstrip(" ,;:-")
+    if without_dangling_connector != text.rstrip(" ,;:-"):
+        return without_dangling_connector + "."
+
+    sentence_ends = list(re.finditer(r"[.!?](?=\s|$)", text))
+    if sentence_ends:
+        completed = text[: sentence_ends[-1].end()].strip()
+        if len(completed) >= min(80, max(1, len(text) // 2)):
+            return completed
+
+    text = text.rstrip(" ,;:-")
+    if not text:
+        return " ".join(str(fallback or "").split())[:maximum_characters].rstrip()
+    if len(text) >= maximum_characters:
+        text = text[: max(1, maximum_characters - 1)].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return text + "."

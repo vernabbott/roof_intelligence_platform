@@ -75,11 +75,16 @@ class AerialImageryTests(unittest.TestCase):
                 "jeffco_drapp_2022_aerial_qa_status": "missing",
                 "world_imagery_aerial_image_url": "https://example.test/fallback",
                 "world_imagery_aerial_image_file": "/tmp/fallback.jpg",
+                "world_imagery_aerial_analysis_image_file": "/tmp/fallback-target.png",
                 "world_imagery_aerial_qa_status": "ok",
             }
             collector.sync_primary_aerial_fields(record)
             self.assertEqual(record["primary_aerial_source"], "Esri World Imagery")
             self.assertEqual(record["primary_aerial_image_file"], "/tmp/fallback.jpg")
+            self.assertEqual(
+                record["primary_aerial_analysis_image_file"],
+                "/tmp/fallback-target.png",
+            )
         finally:
             collector.IMAGERY_SOURCES = original_sources
 
@@ -111,6 +116,35 @@ class AerialImageryTests(unittest.TestCase):
             with Image.open(output) as image:
                 self.assertEqual(max(image.size), 640)
             self.assertEqual(collector.image_qa(output)["status"], "blank")
+
+    def test_target_roof_analysis_image_masks_everything_outside_footprint(self):
+        source = {"key": "test", "image_units": "feet"}
+        polygon = box(20, 20, 80, 80)
+        with TemporaryDirectory() as directory, patch.object(
+            collector,
+            "building_polygon_for_imagery_source",
+            return_value=polygon,
+        ):
+            source_path = Path(directory) / "parcel-test-ai-crop.jpg"
+            Image.new("RGB", (100, 100), (220, 30, 30)).save(source_path)
+
+            output, coverage = collector.save_target_roof_analysis_image(
+                {},
+                source,
+                str(source_path),
+                10,
+            )
+
+            self.assertEqual(Path(output).name, "parcel-test-ai-target.png")
+            self.assertGreater(coverage, 0.5)
+            self.assertLess(coverage, 0.6)
+            with Image.open(output).convert("RGB") as masked:
+                center = masked.getpixel((50, 50))
+                self.assertLess(max(abs(actual - expected) for actual, expected in zip(center, (220, 30, 30))), 4)
+                self.assertEqual(
+                    masked.getpixel((2, 2)),
+                    collector.TARGET_ROOF_MASK_BACKGROUND,
+                )
 
     def test_year_only_imagery_date_is_used_conservatively(self):
         row = {"Primary Aerial Photo Date": "2022"}

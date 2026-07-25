@@ -41,6 +41,7 @@ are future feature work and require a separate migration and design review.
 |---|---|
 | `20260722000100_create_roof_intelligence_reporting.sql` | Applied and verified July 22, 2026 |
 | `20260722000200_prepare_roof_intelligence_cutover.sql` | Applied and verified July 22, 2026 |
+| `20260722000300_add_report_edit_requests_and_authenticated_access.sql` | Prepared locally; not applied |
 
 This migration creates empty centralized Roof Intelligence job, property,
 report, immutable revision, asset, notification, and county-health structures,
@@ -63,3 +64,7 @@ application. Follow-up verification confirmed that its property-override table
 was empty, its retention and override lifecycle passed inside a rolled-back
 transaction, and only `service_role` can execute the atomic worker-claim
 function. PCS and PilotPoint do not call these structures yet.
+
+The report-edit migration adds an authenticated, idempotent request queue and
+read-only report-history policies for the future PCS web application. It must
+be rehearsed in the separate staging project before it is applied elsewhere.

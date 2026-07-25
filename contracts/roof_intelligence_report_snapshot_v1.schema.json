@@ -83,6 +83,23 @@
       "properties": {
         "roof_type": { "type": "string" },
         "roof_system": { "type": "string" },
+        "roof_structure": {
+          "type": "object",
+          "properties": {
+            "sections": { "enum": ["single", "multiple", "indeterminate"] },
+            "slopes": { "enum": ["single", "multiple", "indeterminate"] },
+            "slope_form": { "enum": ["flat", "low_slope", "pitched", "mixed", "indeterminate"] },
+            "parapet_walls": {
+              "enum": ["present", "not_visible", "indeterminate"],
+              "deprecated": true,
+              "description": "Legacy compatibility only; new overhead-aerial assessments do not populate or display this field."
+            },
+            "air_conditioning_units": { "enum": ["present", "not_visible", "indeterminate"] },
+            "solar_panels": { "enum": ["present", "not_visible", "indeterminate"] },
+            "skylights": { "enum": ["present", "not_visible", "indeterminate"] }
+          },
+          "additionalProperties": false
+        },
         "overall_score": { "type": "number", "minimum": 0, "maximum": 100 },
         "condition_label": { "enum": ["GOOD", "FAIR", "POOR"] },
         "risk_level": { "enum": ["LOW", "MODERATE", "HIGH"] },

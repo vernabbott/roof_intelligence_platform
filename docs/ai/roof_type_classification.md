@@ -13,6 +13,7 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 ## Supported Candidate Keys
 
 - `tpo` — thermoplastic polyolefin single-ply membrane
+- `tpo_pvc_or_coating` — controlled final-stage result for a smooth white single-ply or coated surface whose chemistry cannot be resolved
 - `pvc` — Stage 1 candidate for polyvinyl chloride single-ply membrane; do not expose as a standalone final aerial result
 - `epdm` — synthetic-rubber single-ply membrane
 - `ballasted` — stone- or paver-ballasted low-slope roof; underlying membrane may be unknown
@@ -34,7 +35,7 @@ Roof type and roof condition are separate decisions. Do not classify a material 
    Do not create roof-material zones for parapet coping, edge trim, curbs, equipment housings, mechanical screens, or other rooftop components that are not roof fields.
 3. Before naming a material, record the zone's color family, seam pattern, surface texture, perimeter-stone transition, and raised-ridge pattern. Use `uncertain` when the image does not resolve a cue; do not convert an unresolved cue into an observed absence.
 4. Apply the fundamental material priors below to those observations, then return as many as three evidence-supported candidates per zone. Do not include unsupported possibilities merely because they are common.
-5. Return only a supported canonical type key. For an unresolved white membrane or reflective roof, use `tpo` as the conservative default and preserve PVC or coating as alternatives.
+5. Stage 1 returns the supported specific candidates. In the Stage 2 final output, use `tpo_pvc_or_coating` for an unresolved white membrane or reflective roof that cannot be separated among TPO, PVC, and coating, and preserve the specific materials as alternatives.
 6. Assign confidence to each candidate based on visible evidence, resolution, angle, obstruction, lighting, and remaining alternatives.
 7. Treat estimated area percentages as approximate. Use `0` when the visible share cannot be estimated responsibly.
 
@@ -63,7 +64,7 @@ Roof type and roof condition are separate decisions. Do not classify a material 
 
 Use these as ordered starting probabilities, not absolute rules. Geometry, texture, seams, edge construction, and image quality can strengthen or override color.
 
-- **White:** favor TPO. PVC is a less likely alternative and should lead only with PVC-specific evidence. If a smooth white roof remains visually unresolved among TPO, PVC, and coating, use the established TPO default at reduced confidence.
+- **White:** begin with the white single-ply/coating family. Select TPO only when visible seams, flashings, or other TPO-specific evidence supports it. If a smooth white roof remains visually unresolved among TPO, PVC, and coating, use `tpo_pvc_or_coating` at reduced confidence in the Stage 2 final output.
 - **Gray:** first compare weathered TPO with modified bitumen. Broad, regular sheet seams on a smooth field favor weathered TPO. A gray asphaltic or granular field without a resolved membrane-sheet layout favors modified bitumen. If the image is too soft to reveal seams, mark the seam pattern `uncertain`; do not treat it as proof that seams are absent.
 - **Black:** strongly favor EPDM when the field is smooth, matte, and membrane-like. Frequent narrow roll laps, granules, or asphaltic texture favor modified bitumen instead. Use `epdm_or_mod_bit` when those distinguishing details are unresolved.
 - **Tan aggregate:** compare ballasted with tar-and-gravel/BUR. A deliberate perimeter band with distinctly larger or differently colored stone strongly favors ballasted. A more uniform fine embedded-looking aggregate field favors tar-and-gravel/BUR. When the perimeter transition, stone size, or embedment is not apparent at the available resolution, use `ballasted_or_tar_and_gravel` rather than forcing either type.
@@ -75,7 +76,7 @@ Use these as ordered starting probabilities, not absolute rules. Geometry, textu
 - Do not return standalone `pvc` or `coating` as a final aerial classification. Use `pvc_or_coating`, displayed as **PVC or Coated Roof**, whenever the imagery favors that family over TPO but cannot prove whether the exposed surface is PVC membrane or a coating.
 - Close visual details, readable markings, specifications, or other non-aerial records may support exact PVC or coating identification during a separate verification workflow, but the standard aerial report must retain the combined result.
 - A highly weathered coating may appear patchy, chalky, tan, gray, or uneven rather than uniformly white. Favor `pvc_or_coating` over TPO when a monolithic finish shows irregular application variation, old repairs or substrate details telegraphing through, and localized wear-through without a consistent membrane-sheet layout.
-- Apply the TPO default only to a genuinely smooth, membrane-like white or light roof. Do not apply it to a patchy, heavily weathered, asphaltic-looking, or aggregate-textured surface merely because sun exposure makes portions appear light.
+- Apply `tpo` only to a genuinely smooth, membrane-like white or light roof with resolved TPO-supporting details. Do not apply it to an unresolved white surface or to a patchy, heavily weathered, asphaltic-looking, or aggregate-textured surface merely because sun exposure makes portions appear light.
 - Use `epdm_or_mod_bit`, displayed as **EPDM or Modified Bitumen**, when a dark membrane is established but width, seams, and texture do not support choosing between those two systems.
 - Use `mod_bit_or_coating`, displayed as **Modified Bitumen or Coated Roof**, when a weathered asphaltic-looking surface is established but coating-specific evidence and roll-lap details remain unresolved.
 - Use `mod_bit_or_tar_and_gravel`, displayed as **Modified Bitumen or Tar and Gravel**, when the image suggests an asphaltic or aggregate surface but cannot resolve roll laps, stone embedment, or loose ballast well enough to choose one.

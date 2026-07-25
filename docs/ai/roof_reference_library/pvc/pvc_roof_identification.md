@@ -8,7 +8,7 @@ status: active
 
 Use this guide to identify polyvinyl chloride (PVC) roofing from aerial, drone, and inspection imagery. Treat PVC as a roof-zone classification rather than automatically assigning one material to an entire building. Buildings may contain PVC alongside TPO, EPDM, coatings, modified bitumen, metal, or other systems.
 
-Image-only classification is an informed visual assessment. White PVC, white TPO, and coated roofs can be visually indistinguishable, especially from aerial imagery. In Stage 1, `pvc` may be ranked as an internal candidate when PVC-specific evidence exists. The final standard aerial report must return `tpo` when TPO remains equally plausible or `pvc_or_coating` when PVC/coating is favored over TPO but those two cannot be separated. Do not expose standalone PVC or coating as the final aerial result.
+Image-only classification is an informed visual assessment. White PVC, white TPO, and coated roofs can be visually indistinguishable, especially from aerial imagery. In Stage 1, `pvc` may be ranked as an internal candidate when PVC-specific evidence exists. The final standard aerial report must return `tpo_pvc_or_coating` when all three remain similarly plausible or `pvc_or_coating` when PVC/coating is favored over TPO but those two cannot be separated. Do not expose standalone PVC or coating as the final aerial result.
 
 ## Typical Characteristics
 
@@ -75,7 +75,7 @@ TPO and PVC share their most important visible construction features. The follow
 | Aging | Often remains more uniform | Can become chalky |
 | Seams | Sometimes less apparent | Often easier to see |
 
-Product formulation, age, cleaning, moisture, dirt, sun angle, camera processing, attachment method, and resolution can reverse these tendencies. If TPO remains equally plausible, return `tpo` with reduced confidence. If the image favors PVC or coating over TPO but cannot distinguish those two, return `pvc_or_coating`, displayed as **PVC or Coated Roof**.
+Product formulation, age, cleaning, moisture, dirt, sun angle, camera processing, attachment method, and resolution can reverse these tendencies. If TPO, PVC, and coating remain similarly plausible, return `tpo_pvc_or_coating` with reduced confidence. If the image favors PVC or coating over TPO but cannot distinguish those two, return `pvc_or_coating`, displayed as **PVC or Coated Roof**.
 
 ### Reflective Roof Coating
 

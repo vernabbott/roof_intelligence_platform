@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Report Snapshot v1 without refreshing data or running AI.
-
-This standalone preparation command is not called by the current PCS or
-PilotPoint report workflow.
-"""
+"""Render a validated Report Snapshot v1 without refreshing data or running AI."""
 
 from __future__ import annotations
 

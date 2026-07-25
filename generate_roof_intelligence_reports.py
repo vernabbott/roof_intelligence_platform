@@ -26,8 +26,22 @@ from roof_replacement_cost_estimator import (
     estimate_roof_coating_cost,
     estimate_roof_replacement_cost,
 )
-from report_summary_config import REPORT_SUMMARY_CONFIG, append_with_limit
-from roof_information_config import ROOF_INFORMATION_CONFIG, roof_system_card_text
+from report_summary_config import REPORT_SUMMARY_CONFIG, append_with_limit, finalize_narrative
+from roof_assessment import (
+    ASSESSMENT_SYNC_VERSION,
+    build_consistent_summary,
+    canonical_observations,
+    confirmed_tree_proximity,
+    normalize_tree_evidence,
+    normalize_zone_materials,
+    score_from_breakdown,
+)
+from roof_information_config import (
+    ROOF_INFORMATION_CONFIG,
+    ROOF_TYPE_LABELS,
+    roof_structure_card_text,
+    roof_type_card_text,
+)
 from roof_reference_config import (
     LoadedRoofReference,
     RoofReferenceConfig,
@@ -106,6 +120,10 @@ def aerial_photo_date_value(row: dict) -> str:
 
 def aerial_image_file_value(row: dict) -> str:
     return first_row_value(row, ("Primary Aerial Image File", "Denver GIS Aerial Image File"))
+
+
+def aerial_analysis_image_file_value(row: dict) -> str:
+    return first_row_value(row, ("Primary Aerial Analysis Image File",))
 
 
 def format_aerial_photo_date(value: object) -> str:
@@ -311,7 +329,15 @@ def fallback_analysis(row: dict, best_source: str) -> dict:
         "source": "fallback",
         "best_image_source": best_source,
         "roof_type": "Low-slope membrane",
-        "roof_system": "Unknown membrane",
+        "roof_system": "Single low-slope roof section; rooftop features not determined",
+        "roof_structure": {
+            "sections": "single",
+            "slopes": "single",
+            "slope_form": "low_slope",
+            "air_conditioning_units": "indeterminate",
+            "solar_panels": "indeterminate",
+            "skylights": "indeterminate",
+        },
         "possible_roof_systems": [],
         "roof_age_estimate": f"{age} years" if age else "Unknown",
         "roof_pitch": "Low slope",
@@ -324,6 +350,7 @@ def fallback_analysis(row: dict, best_source: str) -> dict:
             "suspected_ponding": False,
             "high_penetration_density": False,
             "overhanging_trees_or_debris": False,
+            "tree_proximity": "indeterminate",
             "notes": [],
         },
         "observations": [
@@ -364,9 +391,26 @@ def analysis_prompt(row: dict) -> str:
     source_label = aerial_source_label(row)
     return (
         f"Analyze this {source_label} aerial roof image for a commercial roof intelligence report. "
-        "Use only visible image evidence and the provided property metadata. Return JSON only. "
+        "The image is footprint-masked: only the original-color pixels inside the selected target-building footprint "
+        "may be analyzed. Uniform gray pixels are outside the target building and must be ignored completely. Do not "
+        "create roof zones, material conclusions, condition findings, area estimates, or recommendations from any "
+        "roof or structure outside the visible target footprint. Include multiple roof sections only when they remain "
+        "visible inside the same selected footprint. "
+        "Use only visible image evidence and the provided property metadata. Return JSON only. Follow one assessment "
+        "sequence for every report section: establish zone-level visual evidence and material ambiguity first; write "
+        "Roof Observations from those same zone conclusions and visible condition findings; derive visual_risk_factors "
+        "and every condition-breakdown score from those observations. The application derives Roof Type, Report Summary, "
+        "the overall condition score, condition label, and risk level from those canonical findings, so do not introduce "
+        "a different material or condition conclusion in any provisional output field. "
         "When visible evidence supports it, include possible roof system candidates such as TPO/PVC, EPDM, "
         "tar and gravel/BUR, modified bitumen, metal, ballasted membrane, or coating over membrane. "
+        "Use roof_type only for the roofing surface material. Use roof_structure and roof_system only for the physical "
+        "configuration of the target roof: whether it has one or multiple connected roof sections, one or multiple "
+        "slopes, the slope form, and whether A/C units, solar panels, and skylights are visibly present. Do not assess "
+        "or report parapet walls because an overhead aerial image does not support that conclusion reliably. "
+        "Do not put membrane or roofing-material names in roof_system. Make roof_system a concise plain-language "
+        "description consistent with roof_structure. Treat a feature as not_visible only when the image is clear enough "
+        "to support that conclusion; otherwise use indeterminate. "
         "For possible_roof_systems, list only systems supported by image evidence; use confidence values that reflect "
         "aerial-only uncertainty, and explain the visual cue in the evidence field. "
         "Score roof condition using visible serviceability risks, not only apparent membrane age. Darkened spots, "
@@ -375,9 +419,12 @@ def analysis_prompt(row: dict) -> str:
         "Membrane Condition, Ponding, Overall Maintenance, and the overall_score unless there is strong visible evidence "
         "they are benign shadows or equipment staining. Numerous penetrations, skylights, vents, curbs, or rooftop units "
         "on an older low-slope roof increase leak potential and should reduce Penetrations and Flashing & Seals. "
-        "Trees overhanging or touching the roof, or visible leaf/debris accumulation, create puncture, abrasion, clogged "
-        "drainage, and moisture-retention risk and should reduce Overall Maintenance and be noted. "
-        "Use the full 0-100 scoring range: clean, uniform, well-drained roofs can score 80+, but visible ponding/staining "
+        "Set visual_risk_factors.tree_proximity to confirmed only when retained target-image pixels clearly show tree "
+        "canopy or branches overlapping or immediately adjacent to the target roof. Mention tree impacts and reduce "
+        "scores for trees only in that confirmed state. Do not infer trees from shadows, vegetation color, leaf-like "
+        "texture, generic debris, or gray masked pixels; use indeterminate when proximity cannot be established. Visible "
+        "roof debris may still be recorded and scored without attributing it to trees. "
+        "Use the full 0-100 scoring range for each breakdown component: clean, uniform, well-drained roofs can score 80+, but visible ponding/staining "
         "or many leak-prone details should generally move the score into fair or poor territory. "
         f"Report-summary and recommendation requirements: {REPORT_SUMMARY_CONFIG.ai_guidance} "
         f"Roof Information requirements: {ROOF_INFORMATION_CONFIG.ai_guidance} "
@@ -407,7 +454,45 @@ def analysis_schema() -> dict:
         "properties": {
             "best_image_source": {"type": "string"},
             "roof_type": {"type": "string"},
-            "roof_system": {"type": "string"},
+            "roof_system": {"type": "string", "maxLength": 300},
+            "roof_structure": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "sections": {
+                        "type": "string",
+                        "enum": ["single", "multiple", "indeterminate"],
+                    },
+                    "slopes": {
+                        "type": "string",
+                        "enum": ["single", "multiple", "indeterminate"],
+                    },
+                    "slope_form": {
+                        "type": "string",
+                        "enum": ["flat", "low_slope", "pitched", "mixed", "indeterminate"],
+                    },
+                    "air_conditioning_units": {
+                        "type": "string",
+                        "enum": ["present", "not_visible", "indeterminate"],
+                    },
+                    "solar_panels": {
+                        "type": "string",
+                        "enum": ["present", "not_visible", "indeterminate"],
+                    },
+                    "skylights": {
+                        "type": "string",
+                        "enum": ["present", "not_visible", "indeterminate"],
+                    },
+                },
+                "required": [
+                    "sections",
+                    "slopes",
+                    "slope_form",
+                    "air_conditioning_units",
+                    "solar_panels",
+                    "skylights",
+                ],
+            },
             "possible_roof_systems": {
                 "type": "array",
                 "items": {
@@ -437,6 +522,10 @@ def analysis_schema() -> dict:
                     "suspected_ponding": {"type": "boolean"},
                     "high_penetration_density": {"type": "boolean"},
                     "overhanging_trees_or_debris": {"type": "boolean"},
+                    "tree_proximity": {
+                        "type": "string",
+                        "enum": ["confirmed", "not_visible", "indeterminate"],
+                    },
                     "notes": {"type": "array", "items": {"type": "string"}, "minItems": 0, "maxItems": 4},
                 },
                 "required": [
@@ -444,6 +533,7 @@ def analysis_schema() -> dict:
                     "suspected_ponding",
                     "high_penetration_density",
                     "overhanging_trees_or_debris",
+                    "tree_proximity",
                     "notes",
                 ],
             },
@@ -476,6 +566,7 @@ def analysis_schema() -> dict:
             "best_image_source",
             "roof_type",
             "roof_system",
+            "roof_structure",
             "possible_roof_systems",
             "roof_age_estimate",
             "roof_pitch",
@@ -590,6 +681,7 @@ def reference_analysis_schema() -> dict:
     schema = copy.deepcopy(analysis_schema())
     canonical_roof_types = [
         "tpo",
+        "tpo_pvc_or_coating",
         "pvc",
         "epdm",
         "ballasted",
@@ -666,13 +758,16 @@ def roof_candidate_prompt(row: dict, config: RoofReferenceConfig) -> str:
         "aerial_photo_date": aerial_photo_date_value(row),
     }
     return (
-        "Stage 1 roof-type candidate classification. Analyze only the target building aerial image and supplied "
+        "Stage 1 roof-type candidate classification. The target image is footprint-masked. Analyze only original-color "
+        "pixels inside the selected building footprint. Uniform gray pixels are outside the target building and must "
+        "not produce roof zones, candidates, observations, or area estimates. Analyze only the target building aerial image and supplied "
         "metadata. Divide materially different roof areas into zones before choosing candidates. For every zone, first "
         "record the required visual_evidence fields without naming a material; then use those observations to return one to three "
         "evidence-supported candidate keys per zone, ordered most likely first. Use confidence conservatively; do not "
         "force exact membrane chemistry from color alone. When a smooth white membrane-like surface cannot be separated "
-        "among TPO, PVC, and coating, rank tpo first with reduced confidence; rank pvc or coating first only when their "
-        "specific evidence is clear. Do not apply the TPO default to weathered asphaltic or aggregate-textured roofs. Use the "
+        "among TPO, PVC, and coating, keep all supported candidates and state that limitation; do not treat TPO as a "
+        "conclusion merely because the surface is white. Rank a specific material first only when its distinguishing "
+        "evidence is visible. Do not apply a TPO default to weathered asphaltic or aggregate-textured roofs. "
         "Treat no_visible_seams as an observation only when the image is sharp enough that seams should be visible; otherwise "
         "record uncertain. Use the canonical key metal without assigning a metal subtype. Use estimated_area_percentage=0 when the visible share cannot "
         "be estimated responsibly. Evaluate target-image sharpness and resolution before assigning confidence. If the image "
@@ -696,13 +791,19 @@ def reference_analysis_prompt(
         analysis_prompt(row)
         + " This is Stage 2 of the roof-reference workflow. Reassess the target building image using the candidate "
         "analysis, selected identification guides, and labeled positive reference images supplied after this text. "
+        "Compare the target against every supplied reference image, not only the first examples. First check whether a "
+        "reference depicts the same building and roof geometry as the target. A reviewer-confirmed same-building match "
+        "is strong roof-type evidence when the visible roof surface and layout have not materially changed; do not "
+        "override that evidence with a generic color prior. If the target appears reroofed or materially changed, explain "
+        "the visible change instead. Name any same-building or especially strong matching reference filename in the "
+        "zone's supporting_cues so the comparison is auditable. "
         "Reference examples are comparisons, not templates: do not classify from color, building shape, or superficial "
         "image similarity alone. Keep visibly distinct roof zones separate, including a small attached section whose "
         "texture or seam pattern differs from the dominant roof. Use estimated_area_percentage=0 if an area share cannot "
         "be estimated responsibly. Every roof_zones[].roof_type and alternatives entry must be one canonical key from "
-        "the schema. Use tpo as the default only for an unresolved smooth white membrane-like TPO/PVC/coating comparison, "
-        "with reduced confidence and "
-        "the other plausible keys in alternatives. Use metal as the type without a standing-seam, ribbed, or corrugated "
+        "the schema. Use tpo_pvc_or_coating for an unresolved smooth white membrane-like TPO/PVC/coating comparison, "
+        "with the plausible specific keys in alternatives. Use tpo only when TPO-specific evidence is resolved. "
+        "Use metal as the type without a standing-seam, ribbed, or corrugated "
         "subtype. A dark, flat, matte attached roof without resolved raised-rib shadows or metal edge construction should "
         "favor EPDM over metal. Dense regular full-field panel lines plus rigid geometry may support generic metal in soft "
         "imagery, but confidence must remain 60 or below when rib height and profile are unresolved. For a dark membrane zone "
@@ -718,9 +819,9 @@ def reference_analysis_prompt(
         "mod_bit_or_tar_and_gravel rather than guessing. For a tan aggregate-covered zone that cannot be separated between "
         "a ballasted membrane and tar-and-gravel/BUR, use ballasted_or_tar_and_gravel. A distinct change to larger or differently "
         "colored stone around the perimeter strongly favors ballasted; when that transition is not resolved, retain the controlled "
-        "ambiguity rather than guessing. If the building is mixed, set the legacy roof_type to "
-        "'Mixed roof types'; the application will derive "
-        "the legacy roof_system summary from canonical zones. If the target image cannot resolve the distinguishing material "
+        "ambiguity rather than guessing. The application will derive the final Roof Type display from the canonical "
+        "roof zones. Keep roof_system and roof_structure limited to physical configuration and rooftop features; never "
+        "use them as material summaries. If the target image cannot resolve the distinguishing material "
         "cues, cap the affected zone confidence and overall ai_confidence at 60. Return JSON only. "
         f"Stage 1 candidate analysis: {json.dumps(stage1)}. Selected reference types: {json.dumps(selected)}. "
         f"Central classification guide:\n{central_guide}"
@@ -758,7 +859,10 @@ def build_openai_reference_content(
             content.append(
                 {
                     "type": "input_text",
-                    "text": f"POSITIVE {item.label} REFERENCE IMAGE — {relative_project_path(image_path)}:",
+                    "text": (
+                        f"REVIEWER-CONFIRMED POSITIVE {item.label} REFERENCE IMAGE — "
+                        f"{relative_project_path(image_path)}:"
+                    ),
                 }
             )
             content.append(
@@ -805,7 +909,14 @@ def build_gemini_reference_parts(
             }
         )
         for image_path in item.image_paths:
-            parts.append({"text": f"POSITIVE {item.label} REFERENCE IMAGE — {relative_project_path(image_path)}:"})
+            parts.append(
+                {
+                    "text": (
+                        f"REVIEWER-CONFIRMED POSITIVE {item.label} REFERENCE IMAGE — "
+                        f"{relative_project_path(image_path)}:"
+                    )
+                }
+            )
             parts.append(gemini_inline_image(image_path))
     return parts
 
@@ -927,12 +1038,17 @@ def call_openai_structured(
     return json.loads(text), data
 
 
-def reference_images_per_type() -> int:
+def reference_images_per_type() -> int | None:
+    raw = os.environ.get("ROOF_REFERENCE_IMAGES_PER_TYPE")
+    if raw is None or not raw.strip() or raw.strip().lower() in {"all", "unlimited", "0"}:
+        return None
     try:
-        value = int(os.environ.get("ROOF_REFERENCE_IMAGES_PER_TYPE", "2"))
-    except ValueError:
-        value = 2
-    return max(1, min(value, 4))
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("ROOF_REFERENCE_IMAGES_PER_TYPE must be a positive integer or 'all'") from exc
+    if value < 1:
+        raise RuntimeError("ROOF_REFERENCE_IMAGES_PER_TYPE must be a positive integer or 'all'")
+    return value
 
 
 def validate_candidate_analysis(stage1: dict) -> None:
@@ -980,46 +1096,37 @@ def validate_reference_analysis(analysis: dict) -> None:
 
 
 def normalize_reference_analysis(analysis: dict) -> None:
-    """Derive legacy report labels from canonical Stage 2 roof-zone types."""
-    labels = {
-        "tpo": "TPO",
-        "pvc": "PVC",
-        "epdm": "EPDM",
-        "ballasted": "Ballasted",
-        "metal": "Metal",
-        "mod_bit": "Modified bitumen",
-        "tar_and_gravel": "Tar and gravel / BUR",
-        "coating": "Coated roof",
-        "pvc_or_coating": "PVC or Coated Roof",
-        "epdm_or_mod_bit": "EPDM or Modified Bitumen",
-        "mod_bit_or_coating": "Modified Bitumen or Coated Roof",
-        "mod_bit_or_tar_and_gravel": "Modified Bitumen or Tar and Gravel",
-        "ballasted_or_tar_and_gravel": "Ballasted or Tar and Gravel",
-        "unknown": "Unknown",
-    }
+    """Derive all displayed material facts from the canonical zone evidence."""
+    normalize_zone_materials(analysis)
+    normalize_tree_evidence(analysis)
     zone_types: list[str] = []
     for zone in analysis.get("roof_zones") or []:
         key = zone.get("roof_type")
         if key in {"pvc", "coating"}:
             key = "pvc_or_coating"
             zone["roof_type"] = key
-        if key in labels and key not in zone_types:
+        if key in ROOF_TYPE_LABELS and key not in zone_types:
             zone_types.append(key)
 
     resolved = [key for key in zone_types if key != "unknown"]
     has_unknown = "unknown" in zone_types
     if len(resolved) > 1 or (resolved and has_unknown):
         analysis["building_classification"] = "mixed"
-        analysis["roof_type"] = "Mixed roof types"
-        analysis["roof_system"] = "Mixed roof types: " + ", ".join(labels[key] for key in zone_types)
     elif resolved:
         analysis["building_classification"] = "single"
-        analysis["roof_type"] = labels[resolved[0]]
-        analysis["roof_system"] = labels[resolved[0]]
     else:
         analysis["building_classification"] = "indeterminate"
-        analysis["roof_type"] = "Unknown"
-        analysis["roof_system"] = "Unknown"
+    analysis["roof_type"] = roof_type_card_text(analysis)
+    analysis["roof_system"] = roof_structure_card_text(analysis)
+    source_observations = [
+        normalize_text(item)
+        for item in analysis.get("observations") or []
+        if normalize_text(item)
+    ]
+    observations = canonical_observations(analysis)
+    if observations != source_observations:
+        analysis.setdefault("source_observations", source_observations)
+    analysis["observations"] = observations
 
 
 def call_openai_reference_analysis(row: dict, target_path: Path, model: str) -> dict:
@@ -1333,6 +1440,20 @@ def load_or_create_analysis(
     else:
         analysis = fallback_analysis(row, best_source)
 
+    analysis["recommendation"] = finalize_narrative(
+        analysis.get("recommendation"),
+        REPORT_SUMMARY_CONFIG.recommendation_max_characters,
+        REPORT_SUMMARY_CONFIG.fallback_recommendation,
+    )
+    analysis["roof_type"] = roof_type_card_text(analysis)
+    analysis["roof_system"] = roof_structure_card_text(analysis)
+    analysis = apply_visual_risk_adjustment(analysis, row)
+    analysis["target_scope"] = {
+        "policy": "selected canonical building footprint only",
+        "mask_version": normalize_text(row.get("Primary Aerial Target Mask Version")),
+        "mask_coverage": normalize_text(row.get("Primary Aerial Target Mask Coverage")),
+    }
+
     if cache_fallback:
         cache_path = cache_dir / f"fallback-{parcel}.json"
     cache_path.write_text(json.dumps(analysis, indent=2), encoding="utf-8")
@@ -1572,26 +1693,47 @@ def clamp_score(value: object, default: int = 0) -> int:
 
 
 def visual_risk_factors_from_text(analysis: dict) -> dict:
+    normalize_tree_evidence(analysis)
     factors = dict(analysis.get("visual_risk_factors") or {})
     notes = factors.get("notes")
     if not isinstance(notes, list):
         notes = []
 
     text = " ".join(
-        [normalize_text(analysis.get("summary")), normalize_text(analysis.get("recommendation"))]
-        + [normalize_text(item) for item in analysis.get("observations") or []]
+        [normalize_text(item) for item in analysis.get("observations") or []]
+        + [normalize_text(item) for item in notes]
     ).lower()
 
     for key, factor_config in REPORT_SUMMARY_CONFIG.visual_risk_factors.items():
-        if not isinstance(factors.get(key), bool) and any(term.lower() in text for term in factor_config.indicators):
+        if any(term.lower() in text for term in factor_config.indicators):
             factors[key] = True
         factors.setdefault(key, False)
+    if not confirmed_tree_proximity({"visual_risk_factors": factors}):
+        has_visible_debris = any(
+            term in text
+            for term in (
+                "roof debris",
+                "debris accumulation",
+                "visible debris",
+                "leaf accumulation",
+                "leaves on the roof",
+            )
+        )
+        if not has_visible_debris:
+            factors["overhanging_trees_or_debris"] = False
     factors["notes"] = [normalize_text(note) for note in notes if normalize_text(note)][:4]
     return factors
 
 
-def apply_visual_risk_adjustment(analysis: dict) -> dict:
+def apply_visual_risk_adjustment(analysis: dict, row: dict | None = None) -> dict:
     adjusted = dict(analysis)
+    if isinstance(adjusted.get("roof_zones"), list):
+        normalize_reference_analysis(adjusted)
+    adjusted["recommendation"] = finalize_narrative(
+        adjusted.get("recommendation"),
+        REPORT_SUMMARY_CONFIG.recommendation_max_characters,
+        REPORT_SUMMARY_CONFIG.fallback_recommendation,
+    )
     factors = visual_risk_factors_from_text(adjusted)
     adjusted["visual_risk_factors"] = factors
     breakdown = dict(adjusted.get("breakdown") or {})
@@ -1617,7 +1759,12 @@ def apply_visual_risk_adjustment(analysis: dict) -> dict:
         breakdown["Penetrations"] = min(clamp_score(breakdown.get("Penetrations"), 62), 58)
         breakdown["Flashing & Seals"] = min(clamp_score(breakdown.get("Flashing & Seals"), 66), 64)
     if factors.get("overhanging_trees_or_debris"):
-        active_labels.append(REPORT_SUMMARY_CONFIG.visual_risk_factors["overhanging_trees_or_debris"].label)
+        tree_config = REPORT_SUMMARY_CONFIG.visual_risk_factors["overhanging_trees_or_debris"]
+        active_labels.append(
+            tree_config.confirmed_tree_label
+            if confirmed_tree_proximity(adjusted) and tree_config.confirmed_tree_label
+            else tree_config.label
+        )
         score_cap = min(score_cap, 76)
         breakdown["Overall Maintenance"] = min(clamp_score(breakdown.get("Overall Maintenance"), 66), 62)
         breakdown["Membrane Condition"] = min(clamp_score(breakdown.get("Membrane Condition"), 70), 68)
@@ -1631,11 +1778,11 @@ def apply_visual_risk_adjustment(analysis: dict) -> dict:
         )
     adjusted["recommendation"] = recommendation
 
-    if not active_labels:
-        return adjusted
-
     original_score = clamp_score(adjusted.get("overall_score"), 0)
-    adjusted_score = min(original_score, score_cap)
+    adjusted["ai_reported_overall_score"] = original_score
+    breakdown_score = score_from_breakdown(adjusted)
+    adjusted_score = min(breakdown_score, score_cap)
+    adjusted["breakdown_derived_score"] = breakdown_score
     adjusted["visual_risk_score_cap"] = score_cap
     adjusted["overall_score"] = adjusted_score
     adjusted["condition_label"] = condition_label_for_score(adjusted_score)
@@ -1643,17 +1790,14 @@ def apply_visual_risk_adjustment(analysis: dict) -> dict:
 
     concern_text = REPORT_SUMMARY_CONFIG.concern_template.format(labels=", ".join(active_labels))
     observations = [normalize_text(item) for item in adjusted.get("observations") or [] if normalize_text(item)]
-    if not any(label in " ".join(observations).lower() for label in active_labels):
+    if active_labels and not any(label in " ".join(observations).lower() for label in active_labels):
         observations.insert(0, concern_text)
     adjusted["observations"] = observations[:5]
-
-    summary = normalize_text(adjusted.get("summary"))
-    if concern_text.lower() not in summary.lower():
-        adjusted["summary"] = append_with_limit(
-            summary,
-            concern_text,
-            REPORT_SUMMARY_CONFIG.summary_max_characters,
-        )
+    adjusted["assessment_sync_version"] = ASSESSMENT_SYNC_VERSION
+    adjusted["summary"] = build_consistent_summary(
+        adjusted,
+        format_aerial_photo_date(aerial_photo_date_value(row or {})),
+    )
     return adjusted
 
 
@@ -1686,6 +1830,10 @@ def apply_aerial_age_adjustment(row: dict, analysis: dict) -> dict:
         adjusted["aerial_age_adjustment_applied"] = False
         adjusted["aerial_photo_age_years"] = round(image_age_years, 1)
         adjusted["aerial_age_score_adjustment"] = 0
+        adjusted["summary"] = build_consistent_summary(
+            adjusted,
+            format_aerial_photo_date(aerial_photo_date_value(row)),
+        )
         return adjusted
 
     score_adjustment = min(15, int(round(image_age_years)))
@@ -1695,10 +1843,9 @@ def apply_aerial_age_adjustment(row: dict, analysis: dict) -> dict:
     adjusted["overall_score"] = adjusted_score
     adjusted["condition_label"] = condition_label_for_score(adjusted_score)
     adjusted["risk_level"] = risk_level_for_score(adjusted_score)
-    adjusted["summary"] = align_summary_with_adjusted_condition(
-        normalize_text(adjusted.get("summary")),
-        adjusted["condition_label"],
-        adjusted["risk_level"],
+    adjusted["summary"] = build_consistent_summary(
+        adjusted,
+        format_aerial_photo_date(aerial_photo_date_value(row)),
     )
     adjusted["aerial_age_adjustment_applied"] = True
     adjusted["aerial_photo_age_years"] = round(image_age_years, 1)
@@ -1995,7 +2142,11 @@ def visible_concerns_text(analysis: dict) -> str:
     if factors.get("high_penetration_density"):
         concerns.append("many penetrations/units")
     if factors.get("overhanging_trees_or_debris"):
-        concerns.append("tree/debris exposure")
+        concerns.append(
+            "confirmed tree overhang"
+            if confirmed_tree_proximity({"visual_risk_factors": factors})
+            else "roof debris exposure"
+        )
     notes = [normalize_text(note) for note in factors.get("notes") or [] if normalize_text(note)]
     if notes and len(concerns) < 3:
         concerns.extend(notes[: 3 - len(concerns)])
@@ -2062,8 +2213,8 @@ def render_report(row: dict, analysis: dict, denver_path: Path | None, drcog_pat
     draw_key_values_wrapped(
         draw,
         [
-            ("Roof Type", normalize_text(analysis.get("roof_type"))),
-            ("Roof System", roof_system_card_text(analysis)),
+            ("Roof Type", roof_type_card_text(analysis)),
+            ("Roof System", roof_structure_card_text(analysis)),
             ("Visible Concerns", visible_concerns_text(analysis)),
             ("Roof Age Est.", normalize_text(analysis.get("roof_age_estimate"))),
             ("Roof Area", f"{format_int(row.get('Building Footprint Sq Ft'))} SF"),

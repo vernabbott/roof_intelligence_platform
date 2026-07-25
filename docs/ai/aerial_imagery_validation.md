@@ -6,6 +6,8 @@
 ## Implemented behavior
 
 - The default building-footprint buffer for AI crops is 40 feet instead of 100 feet.
+- Roof analysis uses a second, footprint-masked copy of the selected aerial crop. Pixels inside the canonical target-building footprint retain their original imagery; all pixels outside the footprint are replaced with a uniform gray field. The unmasked crop remains the human-facing report image.
+- Both roof-reference classification stages and the legacy AI fallback receive only the masked analysis copy. If the mask cannot be created, report analysis stops rather than silently analyzing neighboring buildings.
 - Denver now uses date-aware Esri World Imagery for report crops instead of the 2018 DRAPP archive. The official [DRCOG public imagery catalog](https://services3.arcgis.com/DgjqnJA1rgO92Soi/arcgis/rest/services/Public_imagery/FeatureServer/57) provides the 2022 original GeoTIFF as a fallback when original-tile retrieval is requested.
 - Jefferson County uses the official [Jefferson County DRAPP 2022 ImageServer](https://gisportal.jeffco.us/image/rest/services/DRAPP/DRAPP2022/ImageServer) as its primary aerial source.
 - Jefferson County retains Esri World Imagery as an automatic fallback when the preferred image is missing, blank, unreadable, or fails to download.

@@ -25,6 +25,7 @@ Status: preparation contract; no application path is connected by this file.
 | `ROOF_INTELLIGENCE_SUPABASE_WRITES_ENABLED` | New PCS requests and revision commands are written to Supabase. |
 | `ROOF_INTELLIGENCE_SUPABASE_WORKER_ENABLED` | PilotPoint claims and completes Supabase jobs. |
 | `ROOF_INTELLIGENCE_SUPABASE_SHADOW_WRITES_ENABLED` | Local writes remain authoritative while equivalent staging records are copied for comparison. |
+| `ROOF_INTELLIGENCE_REPORT_EDITING_ENABLED` | PCS creates and displays immutable report revisions. This also requires the master flag. |
 
 The master flag is `ROOF_INTELLIGENCE_SUPABASE_ENABLED`. Full cutover is true
 only when reads, writes, and worker are enabled and shadow writes are disabled.
@@ -53,9 +54,9 @@ is enabled, browser roles cannot claim jobs, and the worker role can.
 ### 2. Adapter tests with flags off
 
 Implement the PCS repository, PilotPoint worker repository, private asset
-upload/download, and immutable revision service against staging. Keep all flags
-off in the normal PCS and PilotPoint environments. Exercise adapters only from
-tests and explicit staging commands.
+upload/download, and immutable revision service against staging. The local
+SQLite adapter and immutable revision renderer may be exercised in automated
+tests while all flags remain off in normal PCS and PilotPoint environments.
 
 Exit gate: a synthetic job produces Revision 1, a private PDF and report image,
 checksums, a Ready technical state, and a 90-day retention date.
@@ -102,7 +103,9 @@ test report and the local worker has no duplicate queued job.
 
 ## Items that must remain unresolved until their prerequisites exist
 
-- PCS browser policies and user identity mapping wait for PCS authentication.
+- Live PCS user identity mapping waits for the first staging Auth user; the
+  authenticated report-history policies and edit-request RPC are prepared in
+  migration `20260722000300` but are not yet applied.
 - Staging connection tests wait for the staging project URL and worker secret.
 - Production flags remain off until the staging acceptance gates are recorded.
 - The long-running PilotPoint worker host remains a deployment decision; GitHub

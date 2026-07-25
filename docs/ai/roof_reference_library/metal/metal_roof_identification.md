@@ -28,6 +28,15 @@ Soft overhead imagery may still support the generic metal family when narrow par
 
 Color does not define metal roofing. Panel geometry and raised repetitive profiles are the strongest aerial cues.
 
+In direct overhead imagery, classic ribbed metal may appear as a broad, uniform
+tan, gray, or other colored field crossed by many fine, low-contrast, perfectly
+regular parallel lines. Do not dismiss those lines merely because the rib
+shadows are soft. When the lines remain evenly spaced and continuous across
+large connected roof sections, align with the roof-plane geometry, and repeat
+on adjacent physically connected sections, they are strong evidence of a
+ribbed metal roof. Confirm that the pattern belongs to the target building and
+is not a raster, compression, parking-lot, or neighboring-roof artifact.
+
 ## Primary Visual Cues
 
 ### Panel and Rib Pattern
@@ -190,6 +199,20 @@ Visible cues include multiple intersecting standing-seam roof planes, carefully 
 ![Metal roof reference 6](images/metal_006.jpeg)
 
 Visible cues include a simple gable warehouse roof with repeated full-length ribs, strong alternating highlights and shadows, and straight metal perimeter edges.
+
+### Metal Reference 7 — Classic Ribbed Metal in Direct Overhead Imagery
+
+![Classic ribbed metal roof reference](images/metal_007.png)
+
+This user-confirmed metal example shows a large, light-tan industrial roof in a
+direct overhead aerial image. The defining cue is the dense field of fine,
+evenly spaced, parallel ribs that continues consistently across the broad
+connected roof sections. The finish color varies between tan and pale
+gray-green, demonstrating that color and weathering are secondary to the
+manufactured rib pattern. The broad white linear features separate roof
+sections or transitions; they should not be confused with the much finer,
+repetitive metal ribs. Ignore the unrelated neighboring roofs visible beyond
+the target building perimeter.
 
 ## Recommended AI Output
 

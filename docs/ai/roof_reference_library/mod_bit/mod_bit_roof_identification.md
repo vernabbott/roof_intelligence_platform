@@ -154,6 +154,31 @@ Visible cues include a very dark, visually continuous roof with repeated lap ban
 
 Visible cues include a closer gray-black granular field, numerous narrow parallel laps, visible end joints, and layered material around roof openings. This view demonstrates the frequent seam pattern typical of roll-applied asphalt roofing.
 
+### Modified Bitumen Reference 5 — Significantly Aged
+
+![Significantly aged modified bitumen reference](images/aging_001.png)
+
+Visible cues include a light, heavily weathered low-slope field with pronounced
+narrow roll and lap patterns, widespread surface wear and discoloration, and
+numerous rectangular repair or coating variations. This is a typical example of
+significantly aged modified bitumen. Use the repeated roll geometry together with
+the weathered asphaltic surface character; do not identify the material from its
+light color alone. The image supports an aging observation but does not by itself
+establish active leakage, trapped moisture, or the exact assembly.
+
+### Modified Bitumen Reference 6 — Significantly Aged
+
+![Second significantly aged modified bitumen reference](images/aging_002.png)
+
+Visible cues include a large light-colored low-slope field with widespread
+weathering and mottling, repeated narrow roll-lap geometry, numerous rectangular
+patch or repair outlines, and localized dark deterioration near the perimeter.
+This is another typical example of significantly aged modified bitumen. Use the
+roll geometry and weathered asphaltic surface character together rather than
+classifying the material from its light color alone. Tree canopy obscures part of
+the left edge, and the image does not by itself establish active leakage, trapped
+moisture, or the exact assembly.
+
 ## Recommended AI Output
 
 Return the building classification; separate roof zones; material label and confidence; estimated area share; supporting roll, seam, texture, and flashing cues; plausible alternatives; image limitations; and verification needed. Never infer SBS versus APP, installation method, ply count, condition, moisture content, or warranty from aerial appearance alone.

@@ -9,15 +9,18 @@ from generate_roof_intelligence_reports import (
     build_gemini_reference_parts,
     build_openai_candidate_content,
     build_openai_reference_content,
+    apply_visual_risk_adjustment,
     call_gemini_reference_analysis,
     call_openai_reference_analysis,
     encode_image_data_url,
     image_mime_type,
     load_or_create_analysis,
     normalize_reference_analysis,
+    reference_images_per_type,
     reference_analysis_schema,
     roof_candidate_schema,
 )
+from roof_assessment import canonical_observations
 from roof_reference_config import (
     DEFAULT_ROOF_REFERENCE_MANIFEST_PATH,
     ROOF_REFERENCE_FEATURE_ENV,
@@ -34,14 +37,45 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
     def test_manifest_loads_all_approved_types_and_images(self) -> None:
         config = load_roof_reference_config()
         self.assertEqual(len(config.roof_types), 7)
-        self.assertEqual(sum(len(item.reference_image_paths) for item in config.roof_types.values()), 33)
+        self.assertEqual(sum(len(item.reference_image_paths) for item in config.roof_types.values()), 36)
         for item in config.roof_types.values():
             self.assertTrue(item.guide_path.is_file())
-            self.assertTrue(set(item.stage2_image_paths).issubset(set(item.reference_image_paths)))
             self.assertFalse(any("damage" in path.name for path in item.reference_image_paths))
         ballasted = config.roof_types["ballasted"]
         self.assertIn("ballasted_005.jpg", [path.name for path in ballasted.reference_image_paths])
-        self.assertIn("ballasted_005.jpg", [path.name for path in ballasted.stage2_image_paths])
+        metal = config.roof_types["metal"]
+        self.assertIn("metal_007.png", [path.name for path in metal.reference_image_paths])
+        mod_bit_bundle = load_reference_bundle(["mod_bit"], config)
+        self.assertEqual(mod_bit_bundle[0].image_paths, config.roof_types["mod_bit"].reference_image_paths)
+        self.assertIn("aging_002.png", [path.name for path in mod_bit_bundle[0].image_paths])
+
+    def test_obsolete_stage2_subset_is_rejected(self) -> None:
+        document = DEFAULT_ROOF_REFERENCE_MANIFEST_PATH.read_text(encoding="utf-8")
+        document = document.replace(
+            "    reference_images:\n",
+            "    stage2_images:\n"
+            "      - docs/ai/roof_reference_library/tpo/images/tpo_001.jpg\n"
+            "    reference_images:\n",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.yaml"
+            path.write_text(document, encoding="utf-8")
+            with self.assertRaisesRegex(RoofReferenceConfigurationError, "stage2_images is obsolete"):
+                load_roof_reference_config(path)
+
+    def test_guide_and_manifest_image_registration_must_match(self) -> None:
+        document = DEFAULT_ROOF_REFERENCE_MANIFEST_PATH.read_text(encoding="utf-8")
+        document = document.replace(
+            "      - docs/ai/roof_reference_library/tpo/images/tpo_001.jpg\n",
+            "",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.yaml"
+            path.write_text(document, encoding="utf-8")
+            with self.assertRaisesRegex(RoofReferenceConfigurationError, "image registration mismatch"):
+                load_roof_reference_config(path)
 
     def test_missing_manifest_file_is_rejected(self) -> None:
         document = DEFAULT_ROOF_REFERENCE_MANIFEST_PATH.read_text(encoding="utf-8")
@@ -57,6 +91,14 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
             self.assertTrue(roof_reference_feature_enabled(True))
         with patch.dict(os.environ, {ROOF_REFERENCE_FEATURE_ENV: "true"}, clear=False):
             self.assertTrue(roof_reference_feature_enabled(False))
+
+    def test_all_reference_images_are_the_production_default(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(reference_images_per_type())
+        with patch.dict(os.environ, {"ROOF_REFERENCE_IMAGES_PER_TYPE": "all"}, clear=True):
+            self.assertIsNone(reference_images_per_type())
+        with patch.dict(os.environ, {"ROOF_REFERENCE_IMAGES_PER_TYPE": "3"}, clear=True):
+            self.assertEqual(reference_images_per_type(), 3)
 
     def test_candidate_selection_preserves_zones_and_adds_confusion_companion(self) -> None:
         config = load_roof_reference_config()
@@ -187,12 +229,32 @@ class RoofReferenceRequestTests(unittest.TestCase):
                 "evidence_summary",
             },
         )
-        self.assertIn("roof_zones", reference_analysis_schema()["required"])
-        zone_type = reference_analysis_schema()["properties"]["roof_zones"]["items"]["properties"]["roof_type"]
+        final_schema = reference_analysis_schema()
+        self.assertIn("roof_zones", final_schema["required"])
+        self.assertIn("roof_structure", final_schema["required"])
+        self.assertEqual(
+            set(final_schema["properties"]["roof_structure"]["properties"]),
+            {
+                "sections",
+                "slopes",
+                "slope_form",
+                "air_conditioning_units",
+                "solar_panels",
+                "skylights",
+            },
+        )
+        visual_risk = final_schema["properties"]["visual_risk_factors"]
+        self.assertIn("tree_proximity", visual_risk["required"])
+        self.assertEqual(
+            visual_risk["properties"]["tree_proximity"]["enum"],
+            ["confirmed", "not_visible", "indeterminate"],
+        )
+        zone_type = final_schema["properties"]["roof_zones"]["items"]["properties"]["roof_type"]
         self.assertEqual(
             zone_type["enum"],
             [
-                "tpo", "pvc", "epdm", "ballasted", "metal", "mod_bit", "tar_and_gravel", "coating", "pvc_or_coating",
+                "tpo", "tpo_pvc_or_coating", "pvc", "epdm", "ballasted", "metal", "mod_bit",
+                "tar_and_gravel", "coating", "pvc_or_coating",
                 "epdm_or_mod_bit", "mod_bit_or_coating", "mod_bit_or_tar_and_gravel",
                 "ballasted_or_tar_and_gravel", "unknown",
             ],
@@ -226,7 +288,9 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("Required Ambiguity Rules", text)
         self.assertIn("cap that zone confidence and overall ai_confidence at 60", text)
         self.assertIn("first record the required visual_evidence fields", text)
+        self.assertIn("do not treat TPO as a conclusion merely because the surface is white", text)
         self.assertIn("Fundamental Material Priors", text)
+        self.assertIn("Uniform gray pixels are outside the target building", text)
         self.assertEqual(len(images), 1)
         self.assertTrue(images[0]["image_url"].startswith("data:image/jpeg;base64,"))
 
@@ -248,15 +312,19 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("Required Ambiguity Rules", gemini_text)
         self.assertNotIn("roof_damage.md", openai_text)
         self.assertNotIn("roof_damage.md", gemini_text)
-        self.assertIn("Use tpo as the default", openai_text)
+        self.assertIn("Use tpo_pvc_or_coating for an unresolved", openai_text)
         self.assertIn("Use metal as the type without", openai_text)
         self.assertIn("favor EPDM over metal", openai_text)
         self.assertIn("use pvc_or_coating", openai_text)
         self.assertIn("Favor pvc_or_coating over TPO", openai_text)
         self.assertIn("tan matte weathered asphaltic field may be modified bitumen", openai_text)
+        self.assertIn("Compare the target against every supplied reference image", openai_text)
+        self.assertIn("reviewer-confirmed same-building match", openai_text)
+        self.assertIn("REVIEWER-CONFIRMED POSITIVE", openai_text)
         self.assertIn("use ballasted_or_tar_and_gravel", openai_text)
         self.assertIn("Fundamental Material Priors", openai_text)
         self.assertIn("cap the affected zone confidence and overall ai_confidence at 60", openai_text)
+        self.assertIn("must be ignored completely", openai_text)
 
     def test_trace_records_manifest_guides_images_and_stage1(self) -> None:
         bundle = load_reference_bundle(["tpo"], self.config, images_per_type=1)
@@ -265,6 +333,10 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertEqual(trace["selected_reference_types"], ["tpo"])
         self.assertEqual(len(trace["guides"]), 1)
         self.assertEqual(len(trace["reference_images"]), 1)
+        self.assertEqual(
+            trace["reference_image_coverage"],
+            [{"roof_type": "tpo", "approved_count": 5, "used_count": 1, "complete": False}],
+        )
         self.assertEqual(trace["stage1"], self.stage1)
         self.assertEqual(len(trace["manifest"]["sha256"]), 64)
 
@@ -272,7 +344,15 @@ class RoofReferenceRequestTests(unittest.TestCase):
         return {
             "best_image_source": "Primary aerial imagery",
             "roof_type": "TPO",
-            "roof_system": "TPO",
+            "roof_system": "Single low-slope roof section; A/C units not visible",
+            "roof_structure": {
+                "sections": "single",
+                "slopes": "single",
+                "slope_form": "low_slope",
+                "air_conditioning_units": "not_visible",
+                "solar_panels": "not_visible",
+                "skylights": "not_visible",
+            },
             "possible_roof_systems": [
                 {"system": "TPO/PVC", "confidence": 70, "evidence": "broad white sheets"}
             ],
@@ -287,6 +367,7 @@ class RoofReferenceRequestTests(unittest.TestCase):
                 "suspected_ponding": False,
                 "high_penetration_density": False,
                 "overhanging_trees_or_debris": False,
+                "tree_proximity": "indeterminate",
                 "notes": [],
             },
             "observations": ["One", "Two", "Three"],
@@ -314,23 +395,41 @@ class RoofReferenceRequestTests(unittest.TestCase):
             ],
         }
 
-    def test_reference_analysis_uses_canonical_metal_type_in_legacy_summary(self) -> None:
+    def test_reference_analysis_uses_canonical_metal_type_for_roof_type(self) -> None:
         analysis = self.final_analysis()
         analysis["roof_type"] = "standing-seam metal"
-        analysis["roof_system"] = "standing-seam metal"
         analysis["roof_zones"][0]["roof_type"] = "metal"
         analysis["roof_zones"][0]["alternatives"] = []
         normalize_reference_analysis(analysis)
-        self.assertEqual(analysis["roof_type"], "Metal")
-        self.assertEqual(analysis["roof_system"], "Metal")
+        self.assertEqual(analysis["roof_type"], "Primary: Metal")
+        self.assertIn("Single low-slope plane", analysis["roof_system"])
+        self.assertNotIn("Metal", analysis["roof_system"])
+
+    def test_canonical_observations_capitalize_every_sentence_start(self) -> None:
+        observations = canonical_observations(
+            {
+                "observations": [
+                    "lowercase opening sentence. another lowercase sentence.",
+                    '"quoted sentence starts lowercase." (parenthetical sentence starts lowercase.)',
+                ]
+            }
+        )
+
+        self.assertEqual(
+            observations,
+            [
+                "Lowercase opening sentence. Another lowercase sentence.",
+                '"Quoted sentence starts lowercase." (Parenthetical sentence starts lowercase.)',
+            ],
+        )
 
     def test_reference_analysis_preserves_controlled_epdm_mod_bit_ambiguity(self) -> None:
         analysis = self.final_analysis()
         analysis["roof_zones"][0]["roof_type"] = "epdm_or_mod_bit"
         analysis["roof_zones"][0]["alternatives"] = ["epdm", "mod_bit"]
         normalize_reference_analysis(analysis)
-        self.assertEqual(analysis["roof_type"], "EPDM or Modified Bitumen")
-        self.assertEqual(analysis["roof_system"], "EPDM or Modified Bitumen")
+        self.assertEqual(analysis["roof_type"], "Primary: EPDM or Modified Bitumen")
+        self.assertNotIn("EPDM", analysis["roof_system"])
 
     def test_reference_analysis_combines_standalone_pvc_and_coating(self) -> None:
         for standalone_type in ("pvc", "coating"):
@@ -339,8 +438,76 @@ class RoofReferenceRequestTests(unittest.TestCase):
                 analysis["roof_zones"][0]["roof_type"] = standalone_type
                 normalize_reference_analysis(analysis)
                 self.assertEqual(analysis["roof_zones"][0]["roof_type"], "pvc_or_coating")
-                self.assertEqual(analysis["roof_type"], "PVC or Coated Roof")
-                self.assertEqual(analysis["roof_system"], "PVC or Coated Roof")
+                self.assertEqual(analysis["roof_type"], "Primary: PVC or Coated Roof")
+                self.assertNotIn("PVC", analysis["roof_system"])
+
+    def test_unresolved_white_secondary_stays_consistent_across_sections_and_score(self) -> None:
+        analysis = self.final_analysis()
+        analysis["overall_score"] = 73
+        analysis["breakdown"] = {
+            "Membrane Condition": 52,
+            "Ponding": 46,
+            "Flashing & Seals": 48,
+            "Penetrations": 44,
+            "Overall Maintenance": 48,
+        }
+        analysis["visual_risk_factors"] = {
+            "dark_staining_or_discoloration": True,
+            "suspected_ponding": False,
+            "high_penetration_density": True,
+            "overhanging_trees_or_debris": False,
+            "tree_proximity": "indeterminate",
+            "notes": [
+                "Visible discoloration and many penetrations increase serviceability and leak risk."
+            ],
+        }
+        analysis["roof_zones"] = [
+            {
+                "zone_id": "1",
+                "location": "Main roof field",
+                "roof_type": "ballasted_or_tar_and_gravel",
+                "estimated_area_percentage": 70,
+                "confidence": 55,
+                "supporting_cues": ["Tan aggregate-covered field"],
+                "alternatives": ["ballasted", "tar_and_gravel"],
+                "limitations": ["Stone embedment is not resolved"],
+            },
+            {
+                "zone_id": "2",
+                "location": "Smaller attached roof",
+                "roof_type": "tpo",
+                "estimated_area_percentage": 30,
+                "confidence": 58,
+                "supporting_cues": ["Smooth bright-white surface"],
+                "alternatives": ["pvc", "coating"],
+                "limitations": ["Seams are not resolved and the materials cannot be separated"],
+            },
+        ]
+
+        normalize_reference_analysis(analysis)
+        synchronized = apply_visual_risk_adjustment(
+            analysis,
+            {"Primary Aerial Photo Date": "20240301"},
+        )
+
+        expected_type = (
+            "Primary: Ballasted or Tar and Gravel; "
+            "Secondary: White Single-Ply or Coated Roof"
+        )
+        self.assertEqual(synchronized["roof_type"], expected_type)
+        self.assertEqual(
+            synchronized["roof_zones"][1]["roof_type"],
+            "tpo_pvc_or_coating",
+        )
+        self.assertTrue(
+            any("White Single-Ply or Coated Roof" in item for item in synchronized["observations"])
+        )
+        self.assertIn(expected_type, synchronized["summary"])
+        self.assertIn(
+            f"{synchronized['overall_score']}/100",
+            synchronized["summary"],
+        )
+        self.assertEqual(synchronized["overall_score"], 48)
 
     def test_openai_two_stage_orchestration_records_combined_usage(self) -> None:
         stage1_response = {"usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120}}
@@ -380,7 +547,10 @@ class RoofReferenceFallbackTests(unittest.TestCase):
                 return_value=legacy.copy(),
             ) as legacy_call:
                 analysis = load_or_create_analysis(
-                    {},
+                    {
+                        "Primary Aerial Target Mask Version": "canonical-footprint-v1",
+                        "Primary Aerial Target Mask Coverage": "0.500000",
+                    },
                     Path("target.jpg"),
                     None,
                     Path(temp_dir),
@@ -393,6 +563,14 @@ class RoofReferenceFallbackTests(unittest.TestCase):
         reference_call.assert_not_called()
         legacy_call.assert_called_once()
         self.assertNotIn("reference_workflow", analysis)
+        self.assertEqual(
+            analysis["target_scope"],
+            {
+                "policy": "selected canonical building footprint only",
+                "mask_version": "canonical-footprint-v1",
+                "mask_coverage": "0.500000",
+            },
+        )
 
     def test_feature_failure_retries_legacy_ai_before_static_fallback(self) -> None:
         legacy = {"source": "openai", "roof_type": "Legacy result"}

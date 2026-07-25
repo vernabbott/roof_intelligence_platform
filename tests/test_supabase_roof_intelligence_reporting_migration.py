@@ -15,6 +15,12 @@ CUTOVER_MIGRATION = (
     / "migrations"
     / "20260722000200_prepare_roof_intelligence_cutover.sql"
 )
+EDITING_MIGRATION = (
+    PROJECT_DIR
+    / "supabase"
+    / "migrations"
+    / "20260722000300_add_report_edit_requests_and_authenticated_access.sql"
+)
 
 
 class RoofIntelligenceReportingMigrationTests(unittest.TestCase):
@@ -83,6 +89,33 @@ class RoofIntelligenceCutoverMigrationTests(unittest.TestCase):
     def test_cutover_migration_does_not_add_client_policies(self):
         self.assertIn("enable row level security", self.sql)
         self.assertNotIn("create policy", self.sql)
+
+
+class RoofIntelligenceEditingMigrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.sql = EDITING_MIGRATION.read_text(encoding="utf-8").lower()
+
+    def test_adds_authenticated_immutable_revision_request_queue(self):
+        self.assertIn("create table public.roof_intelligence_report_edit_requests", self.sql)
+        self.assertIn("request_roof_intelligence_report_edit", self.sql)
+        self.assertIn("'report_revision'", self.sql)
+        self.assertIn("parent_revision_id", self.sql)
+        self.assertIn("idempotency_key", self.sql)
+
+    def test_limits_edits_to_approved_fields_and_future_square_footage(self):
+        for field in (
+            "roof_area_sqft", "roof_type", "roof_system", "roof_condition_score",
+            "report_summary", "recommendation",
+        ):
+            self.assertIn(field, self.sql)
+        self.assertIn("not apply_square_footage_to_future or edit_patch ? 'roof_area_sqft'", self.sql)
+
+    def test_authenticated_users_can_read_history_but_not_mutate_ready_revisions(self):
+        self.assertIn("roof_intelligence_report_revisions_authenticated_read", self.sql)
+        self.assertIn("grant execute on function", self.sql)
+        self.assertNotIn("roof_intelligence_report_revisions_authenticated_update", self.sql)
+        self.assertNotIn("roof_intelligence_report_revisions_authenticated_delete", self.sql)
 
 
 if __name__ == "__main__":

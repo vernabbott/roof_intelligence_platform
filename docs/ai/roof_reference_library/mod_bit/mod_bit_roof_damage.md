@@ -108,7 +108,27 @@ Extensive ply failure, widespread open seams or splitting, active water intrusio
 
 ### Aging
 
-No modified-bitumen aging example images have been added yet.
+#### Aging Example 1 — Significant Aging
+
+![Modified bitumen roof with significant aging](images/aging_001.png)
+
+Typical visible cues include a light, heavily weathered low-slope field; widespread
+surface wear and discoloration; pronounced narrow roll and lap patterns; and
+numerous rectangular repair or coating variations. Treat this as strong aerial
+evidence of significant aging. Aerial imagery alone does not establish active
+leakage, trapped moisture, remaining service life, or the exact modified-bitumen
+assembly; those conclusions require an onsite inspection and moisture testing.
+
+#### Aging Example 2 — Significant Aging
+
+![Second modified bitumen roof with significant aging](images/aging_002.png)
+
+Typical visible cues include a light, heavily weathered field with widespread
+mottling and surface wear, a repeated grid of narrow roll laps, numerous patch or
+repair outlines, and localized dark deterioration near the perimeter. Treat this
+as strong aerial evidence of significant aging. Tree canopy partly obscures the
+left roof edge, and aerial imagery alone does not establish active leakage,
+trapped moisture, remaining service life, or the exact modified-bitumen assembly.
 
 ### Ponding
 

@@ -14,7 +14,13 @@ Enable it for the PCS report worker through `.env` or the process environment:
 ROOF_REFERENCE_CLASSIFICATION=1
 ```
 
-`ROOF_REFERENCE_IMAGES_PER_TYPE` optionally limits the curated Stage 2 images supplied per selected type. Valid runtime values are 1 through 4; the default is 2, and the manifest's `stage2_images` list remains the upper approved set.
+Every image listed under a selected roof type's `reference_images` is supplied
+to Stage 2 by default. There is no separate active-image list, so adding an
+approved positive example automatically makes it part of future comparisons.
+`ROOF_REFERENCE_IMAGES_PER_TYPE` is an explicit emergency cost/size override:
+set it to a positive integer to cap each type, or leave it unset/use `all` to
+retain complete reference coverage. The report trace records approved and used
+counts so incomplete coverage is visible.
 
 When enabled, a roof-reference failure automatically retries the legacy provider call. Static fallback output is used only when provider analysis also fails and `--allow-ai-fallback` is enabled.
 
@@ -52,7 +58,7 @@ For the leading candidates from Stage 1, provide the model with:
 
 - The target building aerial image
 - The complete identification guide for each selected roof type
-- A controlled set of positive reference images for each selected roof type
+- Every approved positive reference image for each selected roof type
 
 Require the model to return the final zone-level classification, confidence, supporting cues, remaining alternatives, and image limitations.
 
@@ -67,6 +73,9 @@ Create a central, explicit manifest that maps each supported roof type to:
 - Enabled or disabled status
 
 Do not rely only on automatic folder discovery. An explicit manifest prevents damage examples, temporary files, misspelled filenames, or unrelated images from being sent as positive identification references.
+At startup, each active identification guide's positive image links must match
+its manifest `reference_images` entries one-for-one. A partial future addition
+therefore stops with a configuration error instead of being silently omitted.
 
 ## Provider Support
 
@@ -79,7 +88,8 @@ Use the same manifest and candidate-selection rules for both providers.
 
 ## Request Controls
 
-- Limit reference images to a curated number per candidate type.
+- Use every manifest-approved reference image by default; any runtime cap must
+  be an explicit, traceable override.
 - Label every reference image with its roof type and filename in the request.
 - Keep positive identification examples separate from damage examples.
 - Validate that every configured guide and image exists before starting an AI request.
@@ -100,6 +110,22 @@ Store the following with each generated analysis:
 - Final zone classifications and confidence returned by Stage 2
 
 This makes it possible to reproduce results and determine which reference-library version influenced a report.
+
+## Codex Library Ingestion
+
+Repository-level instructions in `AGENTS.md` define roof-reference additions as
+a complete ingestion task. A future Codex session must place the image in the
+canonical roof-type folder, update the active identification guide and manifest,
+increment the workflow version, update a condition guide when applicable, and
+run:
+
+```text
+python3 scripts/validate_roof_reference_library.py
+python3 -m unittest tests.test_roof_reference_workflow
+```
+
+The validator enforces guide/manifest parity, substantive image descriptions,
+unique positive image content, valid paths, and complete runtime registration.
 
 ## Verification Tests
 

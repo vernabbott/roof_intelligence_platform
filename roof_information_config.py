@@ -116,6 +116,7 @@ ROOF_INFORMATION_CONFIG = load_roof_information_config()
 
 ROOF_TYPE_LABELS = {
     "tpo": "TPO",
+    "tpo_pvc_or_coating": "White Single-Ply or Coated Roof",
     "pvc": "PVC",
     "epdm": "EPDM",
     "ballasted": "Ballasted",
@@ -132,8 +133,12 @@ ROOF_TYPE_LABELS = {
 }
 
 
-def roof_system_card_text(analysis: dict, config: RoofInformationConfig = ROOF_INFORMATION_CONFIG) -> str:
-    """Return one nonnumeric primary/secondary roof-system statement."""
+def roof_type_card_text(analysis: dict, config: RoofInformationConfig = ROOF_INFORMATION_CONFIG) -> str:
+    """Return one nonnumeric primary/secondary roofing-surface statement."""
+    manual_override = analysis.get("_manual_roof_type_display")
+    if isinstance(manual_override, str) and manual_override.strip():
+        return manual_override.strip()
+
     zones = analysis.get("roof_zones")
     if isinstance(zones, list) and zones:
         candidates: list[tuple[int, int, str, str]] = []
@@ -173,7 +178,9 @@ def roof_system_card_text(analysis: dict, config: RoofInformationConfig = ROOF_I
                 result += f"; {config.secondary_prefix} " + ", ".join(ROOF_TYPE_LABELS[key] for key in secondary)
             return result
 
-    primary = str(analysis.get("roof_system") or analysis.get("roof_type") or "Unknown").strip()
+    primary = str(analysis.get("roof_type") or "Unknown").strip()
+    if primary.lower().startswith(config.primary_prefix.lower()):
+        return primary
     if primary.lower().startswith("mixed roof types:"):
         primary = primary.split(":", 1)[1].split(",", 1)[0].strip()
     if primary.lower() in {"pvc", "coated roof", "coating"}:
@@ -200,3 +207,58 @@ def roof_system_card_text(analysis: dict, config: RoofInformationConfig = ROOF_I
     if secondary_labels:
         result += f"; {config.secondary_prefix} " + ", ".join(secondary_labels)
     return result
+
+
+def roof_system_card_text(analysis: dict, config: RoofInformationConfig = ROOF_INFORMATION_CONFIG) -> str:
+    """Backward-compatible alias for the material-based Roof Type formatter."""
+    return roof_type_card_text(analysis, config)
+
+
+def roof_structure_card_text(analysis: dict) -> str:
+    """Return a concise description of the physical roof configuration."""
+    manual_override = analysis.get("_manual_roof_system_display")
+    if isinstance(manual_override, str) and manual_override.strip():
+        return manual_override.strip()
+
+    structure = analysis.get("roof_structure")
+    if not isinstance(structure, dict):
+        value = str(analysis.get("roof_system") or "").strip()
+        return value or "Physical configuration not determined"
+
+    sections = {
+        "single": "Single roof section",
+        "multiple": "Multiple connected roof sections",
+        "indeterminate": "Roof section count indeterminate",
+    }.get(str(structure.get("sections") or ""), "Roof section count indeterminate")
+
+    slope_count = str(structure.get("slopes") or "")
+    slope_form = str(structure.get("slope_form") or "")
+    slope_form_label = {
+        "flat": "flat",
+        "low_slope": "low-slope",
+        "pitched": "pitched",
+        "mixed": "mixed-slope",
+        "indeterminate": "",
+    }.get(slope_form, "")
+    if slope_count == "single":
+        slopes = f"Single {slope_form_label} plane".replace("  ", " ").strip()
+    elif slope_count == "multiple":
+        slopes = f"Multiple {slope_form_label} planes".replace("  ", " ").strip()
+    else:
+        slopes = "Slope configuration indeterminate"
+
+    phrases = [sections, slopes]
+    feature_labels = (
+        ("air_conditioning_units", "A/C units"),
+        ("solar_panels", "solar panels"),
+        ("skylights", "skylights"),
+    )
+    for field, label in feature_labels:
+        state = str(structure.get(field) or "indeterminate")
+        if state == "present":
+            phrases.append(f"{label} present")
+        elif state == "not_visible":
+            phrases.append(f"no {label} visible")
+        else:
+            phrases.append(f"{label} presence indeterminate")
+    return "; ".join(phrases)

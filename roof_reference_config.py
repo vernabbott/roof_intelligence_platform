@@ -29,7 +29,6 @@ class RoofReferenceType:
     aliases: tuple[str, ...]
     guide_path: Path
     reference_image_paths: tuple[Path, ...]
-    stage2_image_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -98,6 +97,24 @@ def _require_active_markdown(path: Path) -> None:
         raise RoofReferenceConfigurationError(f"{path} must have status: active before runtime use")
 
 
+def _linked_markdown_images(path: Path, project_root: Path) -> tuple[Path, ...]:
+    document = path.read_text(encoding="utf-8")
+    linked: list[Path] = []
+    root = project_root.resolve()
+    for raw_target in re.findall(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+['\"][^'\"]*['\"])?\)", document):
+        if re.match(r"^[a-z][a-z0-9+.-]*:", raw_target, flags=re.IGNORECASE):
+            continue
+        resolved = (path.parent / raw_target.strip("<>")).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise RoofReferenceConfigurationError(f"{path} image link escapes the project root: {raw_target}") from exc
+        if not resolved.is_file():
+            raise RoofReferenceConfigurationError(f"{path} image link does not exist: {raw_target}")
+        linked.append(resolved)
+    return tuple(linked)
+
+
 def load_roof_reference_config(
     manifest_path: str | Path = DEFAULT_ROOF_REFERENCE_MANIFEST_PATH,
     project_root: str | Path = PROJECT_ROOT,
@@ -138,19 +155,35 @@ def load_roof_reference_config(
             _project_path(value, f"roof_types.{key}.reference_images[{index}]", root)
             for index, value in enumerate(_text_list(item.get("reference_images"), f"roof_types.{key}.reference_images"))
         )
-        stage2_paths = tuple(
-            _project_path(value, f"roof_types.{key}.stage2_images[{index}]", root)
-            for index, value in enumerate(_text_list(item.get("stage2_images"), f"roof_types.{key}.stage2_images"))
-        )
-        if not set(stage2_paths).issubset(set(reference_paths)):
-            raise RoofReferenceConfigurationError(f"roof_types.{key}.stage2_images must be approved reference_images")
+        if "stage2_images" in item:
+            raise RoofReferenceConfigurationError(
+                f"roof_types.{key}.stage2_images is obsolete; every approved reference_images entry "
+                "is automatically used in Stage 2"
+            )
+        if len(set(reference_paths)) != len(reference_paths):
+            raise RoofReferenceConfigurationError(f"roof_types.{key}.reference_images contains duplicates")
+        guide_image_paths = _linked_markdown_images(guide_path, root)
+        missing_from_manifest = [path for path in guide_image_paths if path not in reference_paths]
+        missing_from_guide = [path for path in reference_paths if path not in guide_image_paths]
+        if missing_from_manifest or missing_from_guide:
+            details = []
+            if missing_from_manifest:
+                details.append(
+                    "guide images missing from reference_images: "
+                    + ", ".join(path.name for path in missing_from_manifest)
+                )
+            if missing_from_guide:
+                details.append(
+                    "reference_images missing from guide: "
+                    + ", ".join(path.name for path in missing_from_guide)
+                )
+            raise RoofReferenceConfigurationError(f"roof_types.{key} image registration mismatch; " + "; ".join(details))
         roof_types[key] = RoofReferenceType(
             key=key,
             label=_text(item.get("label"), f"roof_types.{key}.label"),
             aliases=_text_list(item.get("aliases") or [], f"roof_types.{key}.aliases", allow_empty=True),
             guide_path=guide_path,
             reference_image_paths=reference_paths,
-            stage2_image_paths=stage2_paths,
         )
 
     if not roof_types:
@@ -302,9 +335,9 @@ def select_reference_types(stage1: dict, config: RoofReferenceConfig) -> list[st
 def load_reference_bundle(
     selected_keys: list[str] | tuple[str, ...],
     config: RoofReferenceConfig,
-    images_per_type: int = 2,
+    images_per_type: int | None = None,
 ) -> list[LoadedRoofReference]:
-    limit = max(1, min(int(images_per_type), 4))
+    limit = None if images_per_type is None or int(images_per_type) <= 0 else int(images_per_type)
     bundle: list[LoadedRoofReference] = []
     for key in selected_keys:
         item = config.roof_types.get(key)
@@ -316,7 +349,7 @@ def load_reference_bundle(
                 label=item.label,
                 guide_path=item.guide_path,
                 guide_text=item.guide_path.read_text(encoding="utf-8"),
-                image_paths=item.stage2_image_paths[:limit],
+                image_paths=item.reference_image_paths[:limit],
             )
         )
     return bundle
@@ -345,6 +378,17 @@ def roof_reference_trace(
     model: str,
     status: str = "completed",
 ) -> dict:
+    image_coverage = []
+    for loaded in bundle:
+        approved = config.roof_types[loaded.key].reference_image_paths
+        image_coverage.append(
+            {
+                "roof_type": loaded.key,
+                "approved_count": len(approved),
+                "used_count": len(loaded.image_paths),
+                "complete": loaded.image_paths == approved,
+            }
+        )
     return {
         "enabled": True,
         "status": status,
@@ -355,6 +399,7 @@ def roof_reference_trace(
         "classification_guide": file_fingerprint(config.classification_guide_path),
         "guides": [file_fingerprint(item.guide_path) for item in bundle],
         "reference_images": [file_fingerprint(path) for item in bundle for path in item.image_paths],
+        "reference_image_coverage": image_coverage,
         "stage1": stage1,
         "selected_reference_types": [item.key for item in bundle],
     }

@@ -6,11 +6,13 @@ from generate_roof_intelligence_reports import (
     analysis_prompt,
     apply_visual_risk_adjustment,
     fallback_analysis,
+    visible_concerns_text,
 )
 from report_summary_config import (
     DEFAULT_REPORT_SUMMARY_PATH,
     REPORT_SUMMARY_CONFIG,
     ReportSummaryConfigurationError,
+    finalize_narrative,
     load_report_summary_config,
 )
 
@@ -45,9 +47,40 @@ class ReportSummaryConfigurationTests(unittest.TestCase):
         self.assertEqual(analysis["summary"], REPORT_SUMMARY_CONFIG.fallback_summary)
         self.assertEqual(analysis["recommendation"], REPORT_SUMMARY_CONFIG.fallback_recommendation)
 
+    def test_incomplete_summary_with_unexpected_character_ends_at_last_sentence(self) -> None:
+        text = (
+            "The main field has uneven color and mottling. "
+            "Numerous penetrations increase flashing and leak-risk potential, and近"
+        )
+
+        finalized = finalize_narrative(text, 475, REPORT_SUMMARY_CONFIG.fallback_summary)
+
+        self.assertEqual(
+            finalized,
+            (
+                "The main field has uneven color and mottling. "
+                "Numerous penetrations increase flashing and leak-risk potential."
+            ),
+        )
+        self.assertNotIn("近", finalized)
+
+    def test_single_incomplete_narrative_is_completed(self) -> None:
+        finalized = finalize_narrative(
+            "The roof appears serviceable but requires an onsite inspection",
+            475,
+            REPORT_SUMMARY_CONFIG.fallback_summary,
+        )
+
+        self.assertEqual(
+            finalized,
+            "The roof appears serviceable but requires an onsite inspection.",
+        )
+
     def test_ai_prompt_includes_markdown_guidance(self) -> None:
         prompt = analysis_prompt({"Address": "123 Test Street"})
         self.assertIn(REPORT_SUMMARY_CONFIG.ai_guidance, prompt)
+        self.assertIn("tree_proximity to confirmed only", prompt)
+        self.assertIn("Do not infer trees from shadows", prompt)
 
     def test_post_processing_adds_configured_contractor_direction(self) -> None:
         analysis = {
@@ -61,6 +94,7 @@ class ReportSummaryConfigurationTests(unittest.TestCase):
                 "suspected_ponding": False,
                 "high_penetration_density": False,
                 "overhanging_trees_or_debris": False,
+                "tree_proximity": "indeterminate",
                 "notes": [],
             },
         }
@@ -74,15 +108,112 @@ class ReportSummaryConfigurationTests(unittest.TestCase):
     def test_visual_risk_language_comes_from_markdown(self) -> None:
         analysis = {
             "overall_score": 80,
-            "summary": "Dark staining is visible.",
+            "summary": "This provisional summary is not canonical.",
             "recommendation": REPORT_SUMMARY_CONFIG.fallback_recommendation,
-            "observations": [],
+            "observations": ["Dark staining is visible."],
             "breakdown": {},
             "visual_risk_factors": {"notes": []},
         }
         adjusted = apply_visual_risk_adjustment(analysis)
         expected_label = REPORT_SUMMARY_CONFIG.visual_risk_factors["dark_staining_or_discoloration"].label
         self.assertIn(expected_label, adjusted["summary"])
+
+    def test_unconfirmed_tree_impact_is_removed_and_not_scored(self) -> None:
+        analysis = {
+            "roof_type": "Primary: EPDM",
+            "overall_score": 80,
+            "recommendation": REPORT_SUMMARY_CONFIG.fallback_recommendation,
+            "observations": [
+                "Possible tree shadows may indicate branches near the roof."
+            ],
+            "breakdown": {
+                "Membrane Condition": 80,
+                "Ponding": 80,
+                "Flashing & Seals": 80,
+                "Penetrations": 80,
+                "Overall Maintenance": 80,
+            },
+            "visual_risk_factors": {
+                "dark_staining_or_discoloration": False,
+                "suspected_ponding": False,
+                "high_penetration_density": False,
+                "overhanging_trees_or_debris": True,
+                "tree_proximity": "indeterminate",
+                "notes": ["Possible tree-related debris exposure."],
+            },
+        }
+
+        adjusted = apply_visual_risk_adjustment(analysis)
+
+        self.assertFalse(adjusted["visual_risk_factors"]["overhanging_trees_or_debris"])
+        self.assertEqual(adjusted["overall_score"], 80)
+        self.assertNotIn("tree", " ".join(adjusted["observations"]).lower())
+        self.assertNotIn("tree", adjusted["summary"].lower())
+        self.assertNotIn("tree", visible_concerns_text(adjusted).lower())
+
+    def test_debris_only_concern_does_not_claim_tree_impact(self) -> None:
+        analysis = {
+            "roof_type": "Primary: EPDM",
+            "overall_score": 80,
+            "recommendation": REPORT_SUMMARY_CONFIG.fallback_recommendation,
+            "observations": ["Visible roof debris accumulation may restrict drainage."],
+            "breakdown": {
+                "Membrane Condition": 80,
+                "Ponding": 80,
+                "Flashing & Seals": 80,
+                "Penetrations": 80,
+                "Overall Maintenance": 80,
+            },
+            "visual_risk_factors": {
+                "dark_staining_or_discoloration": False,
+                "suspected_ponding": False,
+                "high_penetration_density": False,
+                "overhanging_trees_or_debris": True,
+                "tree_proximity": "not_visible",
+                "notes": ["Visible roof debris accumulation may restrict drainage."],
+            },
+        }
+
+        adjusted = apply_visual_risk_adjustment(analysis)
+        concerns = visible_concerns_text(adjusted)
+
+        self.assertTrue(adjusted["visual_risk_factors"]["overhanging_trees_or_debris"])
+        self.assertLessEqual(adjusted["overall_score"], 76)
+        self.assertIn("roof debris exposure", concerns)
+        self.assertNotIn("tree", concerns.lower())
+        self.assertNotIn("tree", adjusted["summary"].lower())
+
+    def test_confirmed_overhang_can_inform_observations_and_score(self) -> None:
+        analysis = {
+            "roof_type": "Primary: EPDM",
+            "overall_score": 80,
+            "recommendation": REPORT_SUMMARY_CONFIG.fallback_recommendation,
+            "observations": [
+                "Tree canopy and branches overhang the target roof edge."
+            ],
+            "breakdown": {
+                "Membrane Condition": 80,
+                "Ponding": 80,
+                "Flashing & Seals": 80,
+                "Penetrations": 80,
+                "Overall Maintenance": 80,
+            },
+            "visual_risk_factors": {
+                "dark_staining_or_discoloration": False,
+                "suspected_ponding": False,
+                "high_penetration_density": False,
+                "overhanging_trees_or_debris": True,
+                "tree_proximity": "confirmed",
+                "notes": ["Tree canopy visibly overlaps the target roof edge."],
+            },
+        }
+
+        adjusted = apply_visual_risk_adjustment(analysis)
+
+        self.assertLessEqual(adjusted["overall_score"], 76)
+        self.assertIn("tree canopy", " ".join(adjusted["observations"]).lower())
+        self.assertIn("confirmed tree overhang", visible_concerns_text(adjusted))
+        self.assertIn("tree", adjusted["summary"].lower())
 
 
 if __name__ == "__main__":

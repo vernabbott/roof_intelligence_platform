@@ -8,7 +8,9 @@ from roof_information_config import (
     ROOF_INFORMATION_CONFIG,
     RoofInformationConfigurationError,
     load_roof_information_config,
+    roof_structure_card_text,
     roof_system_card_text,
+    roof_type_card_text,
 )
 
 
@@ -89,6 +91,60 @@ class RoofInformationConfigurationTests(unittest.TestCase):
                     ]
                 }
                 self.assertEqual(roof_system_card_text(analysis), "Primary: PVC or Coated Roof")
+
+    def test_manual_display_override_takes_precedence_over_roof_zones(self) -> None:
+        analysis = {
+            "_manual_roof_type_display": "Primary: EPDM",
+            "roof_zones": [
+                {
+                    "location": "main roof",
+                    "roof_type": "mod_bit",
+                    "estimated_area_percentage": 100,
+                    "confidence": 95,
+                }
+            ],
+        }
+
+        self.assertEqual(
+            roof_type_card_text(analysis),
+            "Primary: EPDM",
+        )
+
+    def test_roof_system_describes_physical_configuration(self) -> None:
+        analysis = {
+            "roof_structure": {
+                "sections": "multiple",
+                "slopes": "multiple",
+                "slope_form": "low_slope",
+                "air_conditioning_units": "present",
+                "solar_panels": "not_visible",
+                "skylights": "present",
+            }
+        }
+
+        self.assertEqual(
+            roof_structure_card_text(analysis),
+            "Multiple connected roof sections; Multiple low-slope planes; "
+            "A/C units present; no solar panels visible; "
+            "skylights present",
+        )
+
+    def test_legacy_parapet_assessment_is_not_displayed(self) -> None:
+        analysis = {
+            "roof_structure": {
+                "sections": "single",
+                "slopes": "single",
+                "slope_form": "low_slope",
+                "parapet_walls": "present",
+                "air_conditioning_units": "not_visible",
+                "solar_panels": "not_visible",
+                "skylights": "not_visible",
+            }
+        }
+
+        result = roof_structure_card_text(analysis)
+
+        self.assertNotIn("parapet", result.lower())
 
 
 if __name__ == "__main__":

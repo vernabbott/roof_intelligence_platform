@@ -17,6 +17,7 @@ READ_FLAG = "ROOF_INTELLIGENCE_SUPABASE_READS_ENABLED"
 WRITE_FLAG = "ROOF_INTELLIGENCE_SUPABASE_WRITES_ENABLED"
 WORKER_FLAG = "ROOF_INTELLIGENCE_SUPABASE_WORKER_ENABLED"
 SHADOW_WRITE_FLAG = "ROOF_INTELLIGENCE_SUPABASE_SHADOW_WRITES_ENABLED"
+EDITING_FLAG = "ROOF_INTELLIGENCE_REPORT_EDITING_ENABLED"
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -32,6 +33,7 @@ class RoofIntelligenceCutoverFlags:
     writes_enabled: bool
     worker_enabled: bool
     shadow_writes_enabled: bool
+    editing_enabled: bool
 
     @property
     def local_reads_active(self) -> bool:
@@ -69,10 +71,12 @@ def load_cutover_flags(
         writes_enabled=master and _enabled(values, WRITE_FLAG),
         worker_enabled=master and _enabled(values, WORKER_FLAG),
         shadow_writes_enabled=master and _enabled(values, SHADOW_WRITE_FLAG),
+        editing_enabled=master and _enabled(values, EDITING_FLAG),
     )
 
 
 __all__ = [
+    "EDITING_FLAG",
     "MASTER_FLAG",
     "READ_FLAG",
     "SHADOW_WRITE_FLAG",

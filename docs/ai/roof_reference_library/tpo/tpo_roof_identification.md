@@ -8,7 +8,7 @@ status: active
 
 Use this guide to identify thermoplastic polyolefin (TPO) roofing from aerial, drone, and inspection imagery. Treat TPO as a roof-zone classification, not automatically as the roof type for the entire building. A building may contain TPO alongside EPDM, PVC, modified bitumen, built-up roofing, metal, coatings, or other systems.
 
-Image-only classification is an informed visual assessment. White TPO, white PVC, and some coated roofs can be visually indistinguishable, especially in aerial imagery. For this classification workflow, use `tpo` as the conservative default when the imagery supports a smooth white membrane-like roof but does not clearly establish PVC or coating. Reduce confidence and retain PVC and coating as alternatives rather than returning a combined type. Do not apply this default to patchy, heavily weathered, asphaltic-looking, or aggregate-textured surfaces.
+Image-only classification is an informed visual assessment. White TPO, white PVC, and some coated roofs can be visually indistinguishable, especially in aerial imagery. Use `tpo` only when the imagery resolves TPO-supporting seams, flashings, or other distinguishing details. When the imagery supports a smooth white membrane-like roof but cannot separate TPO, PVC, and coating, return `tpo_pvc_or_coating`, displayed as **White Single-Ply or Coated Roof**, at reduced confidence and retain the specific materials as alternatives. Do not apply a TPO conclusion to patchy, heavily weathered, asphaltic-looking, or aggregate-textured surfaces.
 
 ## Typical Characteristics
 
@@ -89,7 +89,7 @@ The following are typical visual tendencies, not definitive identification rules
 
 Use these tendencies only as supporting evidence and consider them together. Product formulation, membrane age, cleaning, surface moisture, accumulated dirt, coatings, camera exposure, sun angle, and image processing can change every characteristic in the table. A weathered PVC roof may appear dull or dirty, while a newer TPO roof may appear bright and glossy. Both materials use heat-welded seams, and seam visibility also depends on attachment method, viewing angle, resolution, and lighting.
 
-When close imagery is available, compare multiple roof areas under similar lighting. A slightly cream, matte, or visibly soiled field with clearly resolved welded seams may favor TPO; a consistently bright-white, smoother, more reflective field with less apparent seams may favor PVC or coating. These cues should normally produce only a tentative preference. If TPO remains equally plausible, return `tpo` with reduced confidence. If PVC/coating is favored over TPO but those two cannot be separated, return `pvc_or_coating`, displayed as **PVC or Coated Roof**.
+When close imagery is available, compare multiple roof areas under similar lighting. A slightly cream, matte, or visibly soiled field with clearly resolved welded seams may favor TPO; a consistently bright-white, smoother, more reflective field with less apparent seams may favor PVC or coating. These cues should normally produce only a tentative preference. If TPO, PVC, and coating remain similarly plausible, return `tpo_pvc_or_coating`. If PVC/coating is favored over TPO but those two cannot be separated, return `pvc_or_coating`, displayed as **PVC or Coated Roof**.
 
 ### White or Coated EPDM
 
@@ -117,7 +117,7 @@ Features favoring a coating over an existing roof include:
 - Worn, peeled, or thin areas exposing a darker or differently textured roof beneath
 - One white finish spanning roof sections that retain different underlying seam patterns or surface textures
 
-A coating can cover TPO as well as other roof systems, so `coated roof` and `TPO substrate` are not mutually exclusive. Newly applied coatings can look smooth and uniform enough to be indistinguishable from a white membrane in aerial imagery. If coating-specific application, wear, or substrate evidence is not clear, return `tpo` with reduced confidence and list coating as an alternative. Request close oblique images, exposed edge details, or installation records.
+A coating can cover TPO as well as other roof systems, so `coated roof` and `TPO substrate` are not mutually exclusive. Newly applied coatings can look smooth and uniform enough to be indistinguishable from a white membrane in aerial imagery. If coating-specific application, wear, or substrate evidence is not clear and TPO/PVC also remain plausible, return `tpo_pvc_or_coating` with reduced confidence. Request close oblique images, exposed edge details, or installation records.
 
 ### Spray Polyurethane Foam
 
@@ -140,7 +140,7 @@ Do not assign one roof type to the whole building until every visible roof zone 
 3. Assign a separate roof-type label and confidence to each zone.
 4. Estimate each zone's share of the visible roof area when practical.
 5. Record transition boundaries and any zones hidden by equipment, shadow, water, vegetation, or image limits.
-6. If TPO, PVC, and coating cannot be separated visually, use the canonical `tpo` type with reduced confidence and preserve the others as alternatives.
+6. If TPO, PVC, and coating cannot be separated visually, use `tpo_pvc_or_coating` with reduced confidence and preserve the specific materials as alternatives.
 
 Example result:
 

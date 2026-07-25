@@ -14,7 +14,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
-from PIL import Image, ImageStat
+from PIL import Image, ImageDraw, ImageStat
 from shapely import wkt
 from shapely.errors import ShapelyError
 from shapely.geometry import shape
@@ -48,6 +48,8 @@ AI_CROP_TILE_LEVEL = 19
 AI_CROP_BUFFER_FEET = 40.0
 AI_CROP_PIXELS = 1536
 AI_CROP_FORMAT = "jpg"
+TARGET_ROOF_MASK_VERSION = "canonical-footprint-v1"
+TARGET_ROOF_MASK_BACKGROUND = (96, 96, 96)
 
 BUILDING_FIELDS = [
     "OBJECTID",
@@ -238,6 +240,9 @@ OUTPUT_FIELDS = [
     ("primary_aerial_photo_date", "Primary Aerial Photo Date"),
     ("primary_aerial_native_resolution", "Primary Aerial Native Resolution"),
     ("primary_aerial_image_file", "Primary Aerial Image File"),
+    ("primary_aerial_analysis_image_file", "Primary Aerial Analysis Image File"),
+    ("primary_aerial_target_mask_version", "Primary Aerial Target Mask Version"),
+    ("primary_aerial_target_mask_coverage", "Primary Aerial Target Mask Coverage"),
     ("primary_aerial_qa_status", "Primary Aerial QA Status"),
     ("primary_aerial_qa_reason", "Primary Aerial QA Reason"),
     ("primary_aerial_qa_blank", "Primary Aerial QA Blank"),
@@ -1325,6 +1330,7 @@ def add_aerial_image_fields(record: dict) -> None:
             record[f"{source['key']}_aerial_photo_date"] = metadata.get("photo_date") or source.get("photo_date", "")
             record[f"{source['key']}_aerial_native_resolution"] = source.get("native_resolution", "")
             record.setdefault(f"{source['key']}_aerial_image_file", "")
+            record.setdefault(f"{source['key']}_aerial_analysis_image_file", "")
             continue
 
         polygon = building_polygon_for_imagery_source(record, source)
@@ -1333,6 +1339,7 @@ def add_aerial_image_fields(record: dict) -> None:
             record[f"{source['key']}_aerial_photo_date"] = ""
             record[f"{source['key']}_aerial_native_resolution"] = ""
             record[f"{source['key']}_aerial_image_file"] = ""
+            record[f"{source['key']}_aerial_analysis_image_file"] = ""
             continue
         bounds = enforce_minimum_export_resolution(padded_bounds(polygon.bounds), source)
         record[f"{source['key']}_aerial_image_url"] = aerial_image_url(source, bounds, polygon)
@@ -1342,6 +1349,7 @@ def add_aerial_image_fields(record: dict) -> None:
             metadata.get("native_resolution") or source.get("native_resolution", "")
         )
         record.setdefault(f"{source['key']}_aerial_image_file", "")
+        record.setdefault(f"{source['key']}_aerial_analysis_image_file", "")
     sync_primary_aerial_fields(record)
 
 
@@ -1353,6 +1361,7 @@ def sync_primary_aerial_fields(record: dict) -> None:
         for source in IMAGERY_SOURCES
         if str(record.get(f"{source['key']}_aerial_qa_status") or "").lower() == "ok"
         and record.get(f"{source['key']}_aerial_image_file")
+        and record.get(f"{source['key']}_aerial_analysis_image_file")
     ]
     available_sources = [
         source
@@ -1366,6 +1375,15 @@ def sync_primary_aerial_fields(record: dict) -> None:
     record["primary_aerial_photo_date"] = record.get(f"{key}_aerial_photo_date", "")
     record["primary_aerial_native_resolution"] = record.get(f"{key}_aerial_native_resolution", "")
     record["primary_aerial_image_file"] = record.get(f"{key}_aerial_image_file", "")
+    record["primary_aerial_analysis_image_file"] = record.get(
+        f"{key}_aerial_analysis_image_file", ""
+    )
+    record["primary_aerial_target_mask_version"] = record.get(
+        f"{key}_aerial_target_mask_version", ""
+    )
+    record["primary_aerial_target_mask_coverage"] = record.get(
+        f"{key}_aerial_target_mask_coverage", ""
+    )
     record["primary_aerial_qa_status"] = record.get(f"{key}_aerial_qa_status", "")
     record["primary_aerial_qa_reason"] = record.get(f"{key}_aerial_qa_reason", "")
     record["primary_aerial_qa_blank"] = record.get(f"{key}_aerial_qa_blank", "")
@@ -1569,6 +1587,86 @@ def save_ai_crop_image(
     )
 
 
+def _polygon_pixel_points(
+    coordinates: Iterable[tuple[float, float]],
+    bounds: tuple[float, float, float, float],
+    width: int,
+    height: int,
+) -> list[tuple[int, int]]:
+    minx, miny, maxx, maxy = bounds
+    span_x = maxx - minx
+    span_y = maxy - miny
+    if span_x <= 0 or span_y <= 0:
+        raise RuntimeError("Target roof mask bounds are invalid")
+    return [
+        (
+            round((float(x) - minx) * (width - 1) / span_x),
+            round((maxy - float(y)) * (height - 1) / span_y),
+        )
+        for x, y in coordinates
+    ]
+
+
+def _draw_geometry_mask(
+    draw: ImageDraw.ImageDraw,
+    geometry: object,
+    bounds: tuple[float, float, float, float],
+    width: int,
+    height: int,
+) -> None:
+    geometry_type = str(getattr(geometry, "geom_type", ""))
+    if geometry_type == "Polygon":
+        exterior = _polygon_pixel_points(geometry.exterior.coords, bounds, width, height)
+        if len(exterior) >= 3:
+            draw.polygon(exterior, fill=255)
+        for interior in geometry.interiors:
+            hole = _polygon_pixel_points(interior.coords, bounds, width, height)
+            if len(hole) >= 3:
+                draw.polygon(hole, fill=0)
+        return
+    for part in getattr(geometry, "geoms", ()):
+        _draw_geometry_mask(draw, part, bounds, width, height)
+
+
+def save_target_roof_analysis_image(
+    record: dict,
+    source: dict,
+    source_path: str,
+    buffer_feet: float,
+) -> tuple[str, float]:
+    """Mask every pixel outside the selected canonical building footprint."""
+    polygon = building_polygon_for_imagery_source(record, source)
+    if polygon is None or polygon.is_empty:
+        raise RuntimeError("A canonical building footprint is required for roof analysis")
+    bounds = square_buffered_bounds(
+        polygon.bounds,
+        buffer_feet,
+        str(source.get("image_units") or "meters"),
+    )
+    output_path = str(
+        os.path.splitext(source_path)[0].replace("-ai-crop", "-ai-target")
+        + ".png"
+    )
+    with Image.open(source_path) as source_image:
+        image = source_image.convert("RGB")
+    mask = Image.new("L", image.size, 0)
+    _draw_geometry_mask(
+        ImageDraw.Draw(mask),
+        polygon,
+        bounds,
+        image.width,
+        image.height,
+    )
+    histogram = mask.histogram()
+    included_pixels = sum(index * count for index, count in enumerate(histogram)) / 255
+    coverage = included_pixels / max(image.width * image.height, 1)
+    if coverage <= 0:
+        raise RuntimeError("The canonical building footprint produced an empty roof-analysis mask")
+    background = Image.new("RGB", image.size, TARGET_ROOF_MASK_BACKGROUND)
+    Image.composite(image, background, mask).save(output_path, "PNG", optimize=True)
+    return output_path, coverage
+
+
 def download_original_tile_images(record: dict, image_dir: str) -> None:
     os.makedirs(image_dir, exist_ok=True)
     base_name = slug(record.get("parcel_number") or record.get("property_address") or record.get("OBJECTID"))
@@ -1627,12 +1725,21 @@ def download_aerial_images(
                 image_buffer_feet,
                 image_format,
             )
+            analysis_path, mask_coverage = save_target_roof_analysis_image(
+                record,
+                source,
+                output_path,
+                image_buffer_feet,
+            )
         except Exception as exc:
             base_name = slug(record.get("parcel_number") or record.get("property_address") or record.get("OBJECTID"))
             print(f"  Warning: failed to create {source['name']} AI crop for {base_name}: {exc}")
             apply_aerial_qa(record, key, None)
             continue
         record[f"{key}_aerial_image_file"] = output_path
+        record[f"{key}_aerial_analysis_image_file"] = analysis_path
+        record[f"{key}_aerial_target_mask_version"] = TARGET_ROOF_MASK_VERSION
+        record[f"{key}_aerial_target_mask_coverage"] = f"{mask_coverage:.6f}"
         apply_aerial_qa(record, key, output_path)
     sync_primary_aerial_fields(record)
 
