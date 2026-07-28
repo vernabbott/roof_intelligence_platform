@@ -16,6 +16,24 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_ROOF_REFERENCE_MANIFEST_PATH = PROJECT_ROOT / "docs/ai/roof_reference_manifest.yaml"
 ROOF_REFERENCE_FEATURE_ENV = "ROOF_REFERENCE_CLASSIFICATION"
+CONFIRMED_ZONE_ROOF_TYPES = {
+    "tpo",
+    "tpo_pvc_or_coating",
+    "pvc",
+    "epdm",
+    "ballasted",
+    "metal",
+    "mod_bit",
+    "tar_and_gravel",
+    "coating",
+    "pvc_or_coating",
+    "epdm_or_mod_bit",
+    "mod_bit_or_coating",
+    "mod_bit_coating_or_tar_and_gravel",
+    "mod_bit_or_tar_and_gravel",
+    "ballasted_or_tar_and_gravel",
+    "unknown",
+}
 
 
 class RoofReferenceConfigurationError(ValueError):
@@ -30,6 +48,17 @@ class RoofReferenceIdentity:
 
 
 @dataclass(frozen=True)
+class ConfirmedRoofZone:
+    zone_id: str
+    location: str
+    roof_type: str
+    estimated_area_percentage: int
+    cues: tuple[str, ...]
+    alternatives: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RoofReferenceImage:
     path: Path
     crop_box: tuple[float, float, float, float] | None
@@ -37,6 +66,7 @@ class RoofReferenceImage:
     cues: tuple[str, ...]
     condition_tags: tuple[str, ...]
     reviewer_confirmed: bool
+    confirmed_zones: tuple[ConfirmedRoofZone, ...]
 
 
 @dataclass(frozen=True)
@@ -53,6 +83,12 @@ class RoofReferenceType:
 
 
 @dataclass(frozen=True)
+class KnownBuildingCorrection:
+    roof_type: str
+    reference: RoofReferenceImage
+
+
+@dataclass(frozen=True)
 class RoofReferenceConfig:
     workflow_version: str
     manifest_path: Path
@@ -60,6 +96,7 @@ class RoofReferenceConfig:
     maximum_candidate_types: int
     confusion_groups: tuple[tuple[str, ...], ...]
     roof_types: dict[str, RoofReferenceType]
+    known_building_corrections: tuple[KnownBuildingCorrection, ...]
 
 
 @dataclass(frozen=True)
@@ -195,6 +232,46 @@ def _reference_image(
         raise RoofReferenceConfigurationError(
             f"{location} cannot register known_buildings without reviewer_confirmed: true"
         )
+
+    raw_zones = metadata.get("confirmed_zones") or []
+    if not isinstance(raw_zones, list):
+        raise RoofReferenceConfigurationError(f"{location}.confirmed_zones must be a YAML list")
+    confirmed_zones: list[ConfirmedRoofZone] = []
+    for index, raw_zone in enumerate(raw_zones):
+        zone_location = f"{location}.confirmed_zones[{index}]"
+        zone = _mapping(raw_zone, zone_location)
+        area = zone.get("estimated_area_percentage")
+        if not isinstance(area, int) or isinstance(area, bool) or not 1 <= area <= 100:
+            raise RoofReferenceConfigurationError(
+                f"{zone_location}.estimated_area_percentage must be an integer from 1 to 100"
+            )
+        confirmed_zones.append(
+            ConfirmedRoofZone(
+                zone_id=_text(zone.get("zone_id"), f"{zone_location}.zone_id"),
+                location=_text(zone.get("location"), f"{zone_location}.location"),
+                roof_type=_text(zone.get("roof_type"), f"{zone_location}.roof_type").lower(),
+                estimated_area_percentage=area,
+                cues=_text_list(zone.get("cues") or [], f"{zone_location}.cues", allow_empty=True),
+                alternatives=_text_list(
+                    zone.get("alternatives") or [],
+                    f"{zone_location}.alternatives",
+                    allow_empty=True,
+                ),
+                limitations=_text_list(
+                    zone.get("limitations") or [],
+                    f"{zone_location}.limitations",
+                    allow_empty=True,
+                ),
+            )
+        )
+    if confirmed_zones and not reviewer_confirmed:
+        raise RoofReferenceConfigurationError(
+            f"{location} cannot register confirmed_zones without reviewer_confirmed: true"
+        )
+    if confirmed_zones and sum(zone.estimated_area_percentage for zone in confirmed_zones) != 100:
+        raise RoofReferenceConfigurationError(
+            f"{location}.confirmed_zones estimated_area_percentage values must total 100"
+        )
     return RoofReferenceImage(
         path=path,
         crop_box=crop_box,
@@ -202,6 +279,7 @@ def _reference_image(
         cues=cues,
         condition_tags=condition_tags,
         reviewer_confirmed=reviewer_confirmed,
+        confirmed_zones=tuple(confirmed_zones),
     )
 
 
@@ -283,6 +361,67 @@ def load_roof_reference_config(
     if not roof_types:
         raise RoofReferenceConfigurationError("roof_types must enable at least one roof type")
 
+    for roof_type, item in roof_types.items():
+        for reference in item.reference_images:
+            for zone in reference.confirmed_zones:
+                if zone.roof_type not in CONFIRMED_ZONE_ROOF_TYPES:
+                    raise RoofReferenceConfigurationError(
+                        f"{reference.path.name} confirmed zone {zone.zone_id} uses unsupported roof_type "
+                        f"{zone.roof_type!r}"
+                    )
+                unknown_alternatives = [
+                    key for key in zone.alternatives if key not in CONFIRMED_ZONE_ROOF_TYPES
+                ]
+                if unknown_alternatives:
+                    raise RoofReferenceConfigurationError(
+                        f"{reference.path.name} confirmed zone {zone.zone_id} uses unknown alternatives: "
+                        + ", ".join(unknown_alternatives)
+                    )
+        zoned_references = [reference for reference in item.reference_images if reference.confirmed_zones]
+        for reference in zoned_references:
+            if roof_type not in {zone.roof_type for zone in reference.confirmed_zones}:
+                raise RoofReferenceConfigurationError(
+                    f"{reference.path.name} is registered under {roof_type} but no confirmed zone uses that type"
+                )
+
+    raw_corrections = raw.get("known_building_corrections") or []
+    if not isinstance(raw_corrections, list):
+        raise RoofReferenceConfigurationError("known_building_corrections must be a YAML list")
+    corrections: list[KnownBuildingCorrection] = []
+    for index, raw_correction in enumerate(raw_corrections):
+        location = f"known_building_corrections[{index}]"
+        correction = _mapping(raw_correction, location)
+        correction_type = _text(correction.get("roof_type"), f"{location}.roof_type").lower()
+        if correction_type not in CONFIRMED_ZONE_ROOF_TYPES:
+            raise RoofReferenceConfigurationError(
+                f"{location}.roof_type uses unsupported roof_type {correction_type!r}"
+            )
+        reference = _reference_image(correction, location, root)
+        if not reference.reviewer_confirmed or not reference.known_buildings:
+            raise RoofReferenceConfigurationError(
+                f"{location} must be reviewer-confirmed and register at least one known building"
+            )
+        if reference.confirmed_zones and correction_type not in {
+            zone.roof_type for zone in reference.confirmed_zones
+        }:
+            raise RoofReferenceConfigurationError(
+                f"{location} has no confirmed zone using its roof_type {correction_type!r}"
+            )
+        for zone in reference.confirmed_zones:
+            if zone.roof_type not in CONFIRMED_ZONE_ROOF_TYPES:
+                raise RoofReferenceConfigurationError(
+                    f"{location} confirmed zone {zone.zone_id} uses unsupported roof_type {zone.roof_type!r}"
+                )
+            unknown_alternatives = [
+                key for key in zone.alternatives if key not in CONFIRMED_ZONE_ROOF_TYPES
+            ]
+            if unknown_alternatives:
+                raise RoofReferenceConfigurationError(
+                    f"{location} confirmed zone {zone.zone_id} uses unknown alternatives: "
+                    + ", ".join(unknown_alternatives)
+                )
+        corrections.append(KnownBuildingCorrection(correction_type, reference))
+
     raw_groups = raw.get("confusion_groups") or []
     if not isinstance(raw_groups, list):
         raise RoofReferenceConfigurationError("confusion_groups must be a YAML list")
@@ -303,6 +442,7 @@ def load_roof_reference_config(
         maximum_candidate_types=maximum_candidate_types,
         confusion_groups=tuple(groups),
         roof_types=roof_types,
+        known_building_corrections=tuple(corrections),
     )
 
 
@@ -400,25 +540,28 @@ def select_reference_types(stage1: dict, config: RoofReferenceConfig) -> list[st
         add("tpo")
         add("ballasted")
 
-    # Manifest order defines confusion-pair priority when the candidate limit
-    # cannot accommodate every possible companion.
+    # Expand confusion pairs only from candidates Stage 1 actually observed.
+    # Helper comparisons added above must not recursively pull in unrelated
+    # material families. For example, adding modified bitumen as a coating
+    # comparison must not then introduce metal to a smooth white membrane case.
     for group in config.confusion_groups:
-        for key in tuple(selected):
-            if key in group:
+        for key in group:
+            if key in observed_candidate_keys:
                 for companion in group:
                     add(companion)
 
-    # Add second-ranked candidates only after mandatory ambiguity pairs have
+    # Add second-ranked candidates only after direct ambiguity pairs have
     # reserved their slots.
     for ranked in ranked_by_zone:
         if len(ranked) > 1:
             add(ranked[1])
 
     for group in config.confusion_groups:
-        for key in tuple(selected):
-            if key in group:
-                for companion in group:
-                    add(companion)
+        for key in group:
+            if key in observed_candidate_keys:
+                if key in group:
+                    for companion in group:
+                        add(companion)
 
     for ranked in ranked_by_zone:
         for key in ranked[2:]:

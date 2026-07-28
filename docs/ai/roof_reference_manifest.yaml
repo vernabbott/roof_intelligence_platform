@@ -1,5 +1,5 @@
 schema_version: 2
-workflow_version: "2.1"
+workflow_version: "2.15"
 classification_guide: docs/ai/roof_type_classification.md
 maximum_candidate_types: 5
 
@@ -7,6 +7,119 @@ confusion_groups:
   - [epdm, mod_bit]
   - [metal, mod_bit]
   - [ballasted, tar_and_gravel]
+
+# Exact-building corrections are deliberately separate from positive material
+# references. They lock reviewer-confirmed results for the same parcel/source/date
+# without teaching an ambiguous roof as a generic example of one material.
+known_building_corrections:
+  - roof_type: tpo_pvc_or_coating
+    path: aerial_images_single_address/arapahoe_aerials/197133206006-arapahoe_aerials-ai-target.png
+    reviewer_confirmed: true
+    crop_box: [0.1126, 0.3848, 0.8874, 0.6146]
+    known_buildings:
+      - parcel_id: "197133206006"
+        image_source: Arapahoe County Aerials
+        image_date: "2024-03-01"
+    cues:
+      - The continuous bright-white roof field is smooth, flexible-looking, and apparently flat, supporting a white single-ply membrane or reflective coating.
+      - Broad low-profile rectangular sheet or application lines cross the field; they are not dense narrow raised metal ribs.
+      - No peak ridge, opposing pitched planes, perpendicular downslope ribs, directional metal sheen, or rigid metal edge construction is visible.
+      - Aerial imagery does not reliably separate TPO or another white single-ply membrane from a coated roof, so preserve White Single-Ply or Coated Roof ambiguity.
+    condition_tags: []
+    confirmed_zones:
+      - zone_id: entire_roof
+        location: entire continuous visible roof field
+        roof_type: tpo_pvc_or_coating
+        estimated_area_percentage: 100
+        cues:
+          - Smooth bright-white continuous low-slope field with broad low-profile sheet or application lines.
+          - No visible peak ridge, pitched rigid planes, or dense narrow raised ribs perpendicular to a ridge.
+          - Rooftop units and penetrations cast shadows but do not establish metal-panel geometry or skylights.
+        alternatives: [tpo, pvc, coating]
+        limitations:
+          - Aerial resolution cannot reliably distinguish TPO from PVC or a reflective coating.
+          - Exact membrane chemistry, substrate, attachment method, and coating history require onsite inspection or records.
+  - roof_type: mod_bit_or_coating
+    path: aerial_images_single_address/arapahoe_aerials/197133208014-arapahoe_aerials-ai-target.png
+    reviewer_confirmed: true
+    crop_box: [0.2559, 0.1901, 0.7441, 0.8105]
+    known_buildings:
+      - parcel_id: "197133208014"
+        image_source: Arapahoe County Aerials
+        image_date: "2024-03-01"
+    cues:
+      - Heavily weathered light asphaltic or coated field with irregular streaking and patchy wear, not manufactured raised ribs.
+      - No crisp rigid planes, repeated rib shadows, standing seams, or metal edge and ridge construction are resolved.
+      - Roll laps and coating application details are not resolved, so preserve Modified Bitumen or Coated Roof ambiguity.
+    condition_tags: [heavy_aging, weathering, suspected_localized_failure, leak_potential, no_distinct_ponding]
+    confirmed_zones:
+      - zone_id: entire_roof
+        location: entire visible roof
+        roof_type: mod_bit_or_coating
+        estimated_area_percentage: 100
+        cues:
+          - The continuous light roof field has heavy, irregular weathering and widespread surface deterioration.
+          - Linear marks vary in width, spacing, continuity, and direction and lack raised-rib shadows or rigid metal-panel geometry.
+          - The deterioration indicates elevated risk of localized surface failure and leakage, but no active leak location is confirmed aerially.
+          - No retained water, basin-shaped staining, sediment ring, or other distinct ponding evidence is visible.
+        alternatives: [mod_bit, coating]
+        limitations:
+          - Aerial imagery does not resolve roll laps or coating application details well enough to separate modified bitumen from a coated roof.
+          - Active leakage, leak locations, wet insulation, and remaining service life require onsite inspection and moisture testing.
+  - roof_type: mod_bit_or_coating
+    path: aerial_images_single_address/arapahoe_aerials/197133204008-arapahoe_aerials-ai-target.png
+    reviewer_confirmed: true
+    crop_box: [0.1048, 0.3197, 0.8952, 0.6803]
+    known_buildings:
+      - parcel_id: "197133204008"
+        image_source: Arapahoe County Aerials
+        image_date: "2024-03-01"
+    cues:
+      - The continuous light low-slope field lacks a resolved broad single-ply sheet-seam grid despite adequate roof-field visibility.
+      - The muted off-white surface has a monolithic, weathered or coated appearance rather than clearly exposed thermoplastic membrane sheets.
+      - Roll laps and coating application details are not resolved, so preserve Modified Bitumen or Coated Roof ambiguity.
+    condition_tags: []
+    confirmed_zones:
+      - zone_id: entire_roof
+        location: entire connected visible roof field
+        roof_type: mod_bit_or_coating
+        estimated_area_percentage: 100
+        cues:
+          - The visible construction joints divide connected roof areas but do not establish different roofing materials.
+          - No broad, repeated single-ply sheet-seam layout is resolved across the otherwise visible light roof field.
+          - The surface may be modified bitumen or a coating; aerial details do not support choosing one of those systems.
+        alternatives: [mod_bit, coating]
+        limitations:
+          - Seam absence is used only because the image provides adequate continuous roof-field visibility; soft or obstructed imagery must record seams as unresolved instead.
+          - Aerial imagery cannot establish the underlying assembly beneath a coating or reliably separate smooth modified bitumen from a coated roof.
+  - roof_type: mod_bit_coating_or_tar_and_gravel
+    path: aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png
+    reviewer_confirmed: true
+    crop_box: [0.1204, 0.3789, 0.8796, 0.6211]
+    known_buildings:
+      - parcel_id: "197133206005"
+        image_source: Arapahoe County Aerials
+        image_date: "2024-03-01"
+    cues:
+      - The continuous low-slope roof has a tan, matte, weathered field that could represent modified bitumen, a coated roof, or tar-and-gravel/BUR.
+      - The image does not resolve modified-bitumen roll laps, coating application evidence, or embedded aggregate well enough to eliminate any of the three supported materials.
+      - White material concentrated around multiple equipment curbs and penetrations is consistent with localized patching or repair activity and elevated leakage potential, but it does not confirm active leaks.
+      - Widespread weathering and numerous localized repairs support the reviewer-confirmed Poor condition rating and concern about roof integrity.
+    condition_tags: [heavy_aging, weathering, penetration_patching, prior_repairs, suspected_localized_failure, leak_potential, poor_condition]
+    confirmed_zones:
+      - zone_id: entire_roof
+        location: entire continuous visible roof field
+        roof_type: mod_bit_coating_or_tar_and_gravel
+        estimated_area_percentage: 100
+        cues:
+          - One continuous tan low-slope construction field spans both sides of the central construction joint; tonal variation does not establish separate materials.
+          - Tan color supports an asphaltic, coated, or aggregate-surfaced interpretation but is not material-specific.
+          - White localized material around multiple rooftop units and penetrations is consistent with prior patching or repair activity.
+          - The repair concentration and widespread weathering support Poor condition and elevated leakage risk without proving current active water intrusion.
+        alternatives: [mod_bit, coating, tar_and_gravel]
+        limitations:
+          - Aerial resolution does not distinguish roll laps, coating application evidence, or embedded aggregate well enough to choose among the three retained alternatives.
+          - Active leakage, wet insulation, exact failure locations, and remaining service life require onsite inspection and moisture testing.
 
 roof_types:
   tpo:
@@ -40,6 +153,38 @@ roof_types:
       - docs/ai/roof_reference_library/epdm/images/epdm_002.JPG
       - docs/ai/roof_reference_library/epdm/images/epdm_003.jpeg
       - docs/ai/roof_reference_library/epdm/images/epdm_004.jpg
+      - path: docs/ai/roof_reference_library/epdm/images/epdm_005.png
+        reviewer_confirmed: true
+        crop_box: [0.2135, 0.1888, 0.7865, 0.8105]
+        known_buildings:
+          - parcel_id: "197128342001"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - The main and right roof field is a dark charcoal, smooth, flexible low-slope membrane with broad rectangular sheet seams, supporting EPDM.
+          - Bright seam lines, repair bands, equipment, and reflected highlights are localized details; the exposed roof field is not white single-ply.
+          - The lighter gray attached roof on the left is a separate zone whose aerial detail does not reliably distinguish EPDM from modified bitumen.
+        condition_tags: []
+        confirmed_zones:
+          - zone_id: main_right
+            location: main and right roof field
+            roof_type: epdm
+            estimated_area_percentage: 75
+            cues:
+              - Dark charcoal smooth membrane field with broad, low-profile rectangular sheet seams.
+              - Local bright seams and rooftop details do not change the dark field material family.
+            alternatives: []
+            limitations:
+              - Aerial imagery does not establish exact membrane assembly or condition.
+          - zone_id: left_secondary
+            location: attached secondary roof on the left side
+            roof_type: epdm_or_mod_bit
+            estimated_area_percentage: 25
+            cues:
+              - Lighter gray low-slope membrane field remains distinct from the main EPDM roof.
+            alternatives: [epdm, mod_bit]
+            limitations:
+              - Seam frequency and surface texture are not resolved well enough to distinguish EPDM from modified bitumen.
   ballasted:
     label: Ballasted roof
     enabled: true
@@ -76,6 +221,142 @@ roof_types:
           - Multiple roof sections show consistent drainage slope and crisp plane transitions.
           - Weathering and repairs interrupt the finish but do not interrupt the manufactured rib geometry.
         condition_tags: [weathering, coating_wear, repairs]
+      - path: docs/ai/roof_reference_library/metal/images/metal_009.png
+        reviewer_confirmed: true
+        crop_box: [0.2363, 0.1855, 0.7637, 0.8145]
+        known_buildings:
+          - parcel_id: "197133204009"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - Dense straight uniformly spaced ribs continue across the full bright-white rigid roof field and identify a metal panel substrate.
+          - The manufactured rib pattern remains coherent through tonal changes and is not a broad single-ply sheet-seam layout.
+          - Localized contrasting repair patches are concentrated around multiple penetrations and curbs.
+        condition_tags: [penetration_patching, prior_repairs, leak_potential, silicone_restoration_candidate]
+        confirmed_zones:
+          - zone_id: entire_roof
+            location: entire visible roof field
+            roof_type: metal
+            estimated_area_percentage: 100
+            cues:
+              - Dense fine straight ribs remain evenly spaced and continuous across the entire rigid roof plane.
+              - Bright white coating or finish does not obscure the manufactured metal-panel geometry.
+              - Several localized patches around penetrations indicate prior repair activity and elevated flashing or seal leakage risk.
+              - The continuous restorable-looking metal field may be a strong silicone restoration candidate if onsite inspection confirms dry, sound, compatible conditions.
+            alternatives: []
+            limitations:
+              - Repair patches indicate prior maintenance and leak potential but do not confirm current active leakage.
+              - Silicone restoration eligibility requires onsite inspection, moisture testing, adhesion testing, substrate verification, repairs, and manufacturer-system review.
+      - path: docs/ai/roof_reference_library/metal/images/metal_010.png
+        reviewer_confirmed: true
+        crop_box: [0.1035, 0.3438, 0.8965, 0.6562]
+        known_buildings:
+          - parcel_id: "197128300071"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - The dominant bright metal roof has dense continuous ribs and repeated narrow rectangular translucent fiberglass skylight panels aligned with those ribs.
+          - The skylight panels have consistent dimensions, orientation, spacing, and a subtly darker translucent appearance that separates them from random coating wear or repair patches.
+          - Silicone restoration must exclude and protect the fiberglass skylight panels so they remain light-transmitting and visually identifiable.
+        condition_tags: [skylights_present, fiberglass_skylight_panels, silicone_coating_exclusion]
+        confirmed_zones:
+          - zone_id: main_metal
+            location: main east and center roof field
+            roof_type: metal
+            estimated_area_percentage: 85
+            cues:
+              - Dense fine ribs extend continuously across the bright rigid metal roof field.
+              - Evenly spaced narrow rectangular translucent panels aligned with the ribs are fiberglass skylights, not patches or coating variation.
+              - Any silicone restoration scope must mask, protect, and exclude the skylight panel faces from coating.
+            alternatives: []
+            limitations:
+              - Aerial imagery cannot establish skylight panel brittleness, seal condition, light transmission, or replacement needs.
+          - zone_id: west_secondary
+            location: attached west roof section
+            roof_type: mod_bit
+            estimated_area_percentage: 15
+            cues:
+              - The attached tan low-slope section is a distinct weathered modified-bitumen roof field.
+            alternatives: [coating]
+            limitations:
+              - Aerial imagery does not resolve the underlying assembly beneath any existing coating.
+      - path: docs/ai/roof_reference_library/metal/images/metal_011.png
+        reviewer_confirmed: true
+        crop_box: [0.1217, 0.3457, 0.8783, 0.6543]
+        known_buildings:
+          - parcel_id: "197133206001"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - Very narrow uniformly spaced ribs cover the full roof and identify manufactured metal panels rather than low-profile modified-bitumen roll laps.
+          - A raised ridge line crosses the center of the roof while the panel ribs run perpendicular to it on the opposing roof planes.
+          - Bright rectangular repairs occupy consistent panel-bay widths and align with the ribs, supporting replaced metal panel sections rather than irregular membrane patches.
+        condition_tags: [panel_section_replacements, prior_repairs, no_distinct_ponding]
+        confirmed_zones:
+          - zone_id: entire_roof
+            location: entire visible roof
+            roof_type: metal
+            estimated_area_percentage: 100
+            cues:
+              - Dense narrow ribs remain uniformly spaced across the full rigid roof field.
+              - The center ridge divides opposing shallow roof planes, and the ribs terminate perpendicular to that raised ridge.
+              - Uniform-width bright rectangles align to the rib grid and represent replaced metal panel sections.
+            alternatives: []
+            limitations:
+              - Aerial imagery does not establish the condition of concealed fasteners, underlayment, insulation, or the watertightness of repaired panel sections.
+      - path: docs/ai/roof_reference_library/metal/images/metal_012.png
+        reviewer_confirmed: true
+        crop_box: [0.1302, 0.3815, 0.8698, 0.6185]
+        known_buildings:
+          - parcel_id: "197128311005"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - A clear raised peak ridge divides opposing pitched roof planes, and dense manufactured ribs run perpendicular to the ridge across the full building.
+          - The blue-gray and cream roof sections retain the same ridge, pitch, rib direction, spacing, and rigid panel construction, so the color boundary does not establish a different material.
+          - The two tones may reflect different installation dates, panel replacement, coating age, or finish, but aerial imagery does not establish which explanation applies.
+          - Repeated lighter rectangular panels have consistent dimensions, spacing, orientation, and rib alignment that identify them as translucent fiberglass skylights.
+        condition_tags: [skylights_present, fiberglass_skylight_panels, silicone_coating_exclusion]
+        confirmed_zones:
+          - zone_id: entire_roof
+            location: entire blue-gray and cream pitched roof field
+            roof_type: metal
+            estimated_area_percentage: 100
+            cues:
+              - One continuous peak ridge and opposing pitched planes span both differently colored sections.
+              - Dense straight ribs remain perpendicular to the ridge and preserve the same manufactured metal-panel geometry through the color transition.
+              - Repeated lighter panels aligned within the rib grid are fiberglass skylights, not a separate roofing material or random repair patches.
+              - Color difference alone may reflect construction, replacement, coating, or weathering history and must not create a second material zone.
+            alternatives: []
+            limitations:
+              - Aerial imagery cannot establish whether the color difference results from installation age, panel replacement, coating age, finish, or weathering.
+              - Skylight panel condition, brittleness, perimeter seals, watertightness, and fall-protection requirements require onsite inspection.
+      - path: docs/ai/roof_reference_library/metal/images/metal_013.png
+        reviewer_confirmed: true
+        crop_box: [0.1322, 0.3411, 0.8678, 0.6589]
+        known_buildings:
+          - parcel_id: "197133204015"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - The entire bright-white roof is one manufactured metal-panel field with dense, narrow, uniformly spaced ribs; the white finish does not establish single-ply membrane.
+          - A continuous center ridge divides two shallow pitched planes, and the ribs run perpendicular downslope from the ridge toward the exposed roof edges.
+          - Visible eave and rake geometry, with edges configured to shed water rather than an enclosing perimeter wall, reinforces the pitched metal interpretation; possible gutter or drainage-edge details are supporting cues only.
+        condition_tags: []
+        confirmed_zones:
+          - zone_id: entire_roof
+            location: entire bright-white main roof and connected upper-left metal section
+            roof_type: metal
+            estimated_area_percentage: 100
+            cues:
+              - One continuous center ridge and opposing shallow pitched planes span the bright-white roof field.
+              - Dense fine manufactured ribs remain uniformly spaced and terminate perpendicular to the ridge on both planes.
+              - Exposed shedding edges and possible gutter context reinforce the ridge-and-rib drainage geometry.
+              - Rooftop units, penetrations, shadows, and highlights do not create a membrane zone or interrupt the metal-panel construction.
+            alternatives: []
+            limitations:
+              - Apparent parapet absence is not a standalone material test; overhead imagery must resolve exposed eave, rake, gutter, or other drainage-edge construction before it is used as supporting evidence.
+              - Aerial imagery cannot establish panel attachment, concealed flashing, gutter condition, insulation condition, or watertightness.
   mod_bit:
     label: Modified bitumen
     enabled: true
@@ -98,6 +379,32 @@ roof_types:
           - Light, heavily weathered asphaltic field with repeated narrow roll-lap geometry.
           - Numerous rectangular patch and repair outlines with localized perimeter deterioration.
         condition_tags: [significant_aging, weathering, patching]
+      - path: docs/ai/roof_reference_library/mod_bit/images/mod_bit_005.png
+        reviewer_confirmed: true
+        crop_box: [0.1901, 0.1237, 0.8099, 0.8763]
+        known_buildings:
+          - parcel_id: "197128306037"
+            image_source: Arapahoe County Aerials
+            image_date: "2024-03-01"
+        cues:
+          - One continuous flat flexible membrane field with repeated low-profile roll and lap banding, not rigid sloped metal panels.
+          - The line pattern lacks raised-rib shadows, crisp panel edges, directional metal sheen, and visible pitch or drainage planes.
+          - Small rectangular gray and black areas interrupt the aged field and align as applied repair patches rather than manufactured panels.
+          - Irregular soft-edged tan areas near the upper roof support recurring moisture retention and ponding rather than rigid material boundaries.
+        condition_tags: [heavy_aging, weathering, patching, ponding_evidence, probable_end_of_service_life, leak_potential]
+        confirmed_zones:
+          - zone_id: entire_roof
+            location: entire visible roof field
+            roof_type: mod_bit
+            estimated_area_percentage: 100
+            cues:
+              - Continuous flat membrane character and low-profile asphaltic roll/lap banding support modified bitumen.
+              - Small rectangular contrasting areas, including the lower-left field, are consistent with localized applied patches.
+              - Irregular basin-shaped tan discoloration near the upper field supports recurring ponding or moisture retention.
+              - Widespread gray-black weathering, repeated repairs, and ponding evidence indicate probable end-of-service-life condition and elevated leakage risk.
+            alternatives: []
+            limitations:
+              - Active leakage, wet insulation, and exact remaining service life cannot be confirmed from aerial imagery and require onsite inspection and moisture testing.
   tar_and_gravel:
     label: Tar and gravel / BUR
     enabled: true

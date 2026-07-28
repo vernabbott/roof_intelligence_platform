@@ -144,6 +144,14 @@ Vegetation usually indicates chronic moisture.
 
 # TPO Roofs
 
+Material zoning and condition scoring are separate. White, cream, tan, gray, or dark variation across one continuous field should remain one material zone when the seam layout, edges, slope, elevation, and construction continue through it. Score the variation as aging, weathering, soiling, repairs, or possible drainage-related discoloration. Do not score ponding, leakage, or wet insulation from color alone; require visible water, low-area geometry, drainage concentration, sediment rings, algae-like growth, or comparable supporting evidence. If weathering obscures exact material cues, reduce identification confidence and use **White Single-Ply or Coated Roof** rather than inventing additional materials.
+
+For every all-metal roof, do not apply a ponding deduction or report ponding as
+an observation or visible-risk factor. Set `suspected_ponding` to false and
+remove ponding, standing-water, and retained-water wording from customer-facing
+observations and notes. Score a separately visible gutter, drain, deformation,
+or structural concern by its physical condition without labeling it ponding.
+
 ## High Priority Indicators
 
 ### Ponding Water

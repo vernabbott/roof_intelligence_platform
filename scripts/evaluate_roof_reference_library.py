@@ -16,8 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from roof_reference_config import load_roof_reference_config
-from roof_reference_retrieval import find_known_building_match, rank_references
+from roof_reference_config import CONFIRMED_ZONE_ROOF_TYPES, load_roof_reference_config
+from roof_reference_retrieval import find_known_building_match, known_building_stage1, rank_references
 
 
 DEFAULT_CASES_PATH = PROJECT_ROOT / "docs/ai/roof_reference_eval_cases.yaml"
@@ -39,8 +39,8 @@ def _project_file(raw_path: object, location: str) -> Path:
 
 def evaluate(cases_path: Path = DEFAULT_CASES_PATH) -> dict:
     document = yaml.safe_load(cases_path.read_text(encoding="utf-8"))
-    if not isinstance(document, dict) or document.get("schema_version") != 1:
-        raise ValueError("roof reference evaluation cases must use schema_version: 1")
+    if not isinstance(document, dict) or document.get("schema_version") not in {1, 2}:
+        raise ValueError("roof reference evaluation cases must use schema_version: 1 or 2")
     cases = document.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("roof reference evaluation cases must contain a non-empty cases list")
@@ -52,13 +52,15 @@ def evaluate(cases_path: Path = DEFAULT_CASES_PATH) -> dict:
     top1_correct = 0
     top3_correct = 0
     classifications_correct = 0
+    zones_correct = 0
+    conditions_correct = 0
 
     for index, case in enumerate(cases):
         if not isinstance(case, dict):
             raise ValueError(f"cases[{index}] must be a mapping")
         case_id = str(case.get("id") or f"case_{index + 1}")
         expected = str(case.get("expected_roof_type") or "")
-        if expected not in config.roof_types:
+        if expected not in CONFIRMED_ZONE_ROOF_TYPES:
             raise ValueError(f"{case_id}: unsupported expected_roof_type {expected!r}")
         target = _project_file(case.get("target_image"), f"{case_id}.target_image")
         property_row = case.get("property") or {}
@@ -78,16 +80,36 @@ def evaluate(cases_path: Path = DEFAULT_CASES_PATH) -> dict:
             if ranked
             else None
         )
-        top1_ok = bool(ranked) and ranked[0].roof_type == expected
+        controlled_known_result = bool(known_match) and expected not in config.roof_types
+        top1_ok = controlled_known_result or (bool(ranked) and ranked[0].roof_type == expected)
         if expected_reference:
             top1_ok = top1_ok and top_reference == str(expected_reference)
-        top3_ok = any(item.roof_type == expected for item in ranked[:3])
+        top3_ok = controlled_known_result or any(item.roof_type == expected for item in ranked[:3])
         classification_ok = predicted == expected
+        expected_zone_types = case.get("expected_zone_types") or [expected]
+        if not isinstance(expected_zone_types, list) or not expected_zone_types:
+            raise ValueError(f"{case_id}.expected_zone_types must be a non-empty list")
+        expected_zone_types = [str(value) for value in expected_zone_types]
+        if known_match:
+            predicted_zone_types = [
+                str(zone.get("candidates", [{}])[0].get("roof_type") or "")
+                for zone in known_building_stage1(known_match).get("roof_zones", [])
+            ]
+        else:
+            predicted_zone_types = [predicted]
+        zone_classification_ok = predicted_zone_types == expected_zone_types
+        expected_condition_tags = case.get("expected_condition_tags") or []
+        if not isinstance(expected_condition_tags, list):
+            raise ValueError(f"{case_id}.expected_condition_tags must be a list")
+        actual_condition_tags = list(known_match.reference.condition_tags) if known_match else []
+        condition_tags_ok = set(map(str, expected_condition_tags)).issubset(actual_condition_tags)
 
         known_correct += int(known_ok)
         top1_correct += int(top1_ok)
         top3_correct += int(top3_ok)
         classifications_correct += int(classification_ok)
+        zones_correct += int(zone_classification_ok)
+        conditions_correct += int(condition_tags_ok)
         confusion[expected][predicted] += 1
         results.append(
             {
@@ -95,6 +117,12 @@ def evaluate(cases_path: Path = DEFAULT_CASES_PATH) -> dict:
                 "expected_roof_type": expected,
                 "predicted_roof_type": predicted,
                 "classification_correct": classification_ok,
+                "expected_zone_types": expected_zone_types,
+                "predicted_zone_types": predicted_zone_types,
+                "zone_classification_correct": zone_classification_ok,
+                "expected_condition_tags": expected_condition_tags,
+                "known_match_condition_tags": actual_condition_tags,
+                "condition_tags_correct": condition_tags_ok,
                 "known_match_correct": known_ok,
                 "known_match_reference": (
                     str(known_match.reference.path.resolve().relative_to(PROJECT_ROOT.resolve()))
@@ -113,6 +141,8 @@ def evaluate(cases_path: Path = DEFAULT_CASES_PATH) -> dict:
         "workflow_version": config.workflow_version,
         "total_cases": total,
         "classification_accuracy": classifications_correct / total,
+        "zone_classification_accuracy": zones_correct / total,
+        "condition_tags_accuracy": conditions_correct / total,
         "known_match_accuracy": known_correct / total,
         "top1_retrieval_accuracy": top1_correct / total,
         "top3_type_recall": top3_correct / total,
@@ -141,8 +171,10 @@ def main() -> int:
         args.json_output.write_text(rendered + "\n", encoding="utf-8")
     passed = all(
         item["classification_correct"]
+        and item["zone_classification_correct"]
         and item["known_match_correct"]
         and item["top1_retrieval_correct"]
+        and item["condition_tags_correct"]
         for item in result["cases"]
     )
     return 0 if passed else 1

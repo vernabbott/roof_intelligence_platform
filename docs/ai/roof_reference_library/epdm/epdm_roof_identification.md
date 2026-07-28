@@ -175,6 +175,14 @@ Visible cues include a black continuous field, strong long parallel sheet divisi
 
 Visible cues include a black, smooth roof field divided into broad rectangular sheets, repeated seam intersections, and dark matching construction around rooftop penetrations and equipment. The sheet dimensions and low-profile seam grid favor a single-ply membrane over narrow-roll asphalt roofing, although close details remain necessary to prove EPDM specifically.
 
+### EPDM Reference 5 — Mixed Roof and False White-Single-Ply Negative
+
+![EPDM reference 5](images/epdm_005.png)
+
+The main and right roof field is reviewer-confirmed EPDM. It is a dark charcoal, smooth low-slope membrane divided by broad, low-profile rectangular sheet seams. White-looking seam tape, repair marks, rooftop equipment, and reflected highlights are localized details; the exposed field itself is not white, so this image must not be classified as white TPO, PVC, or a white coating.
+
+The lighter gray attached roof on the left is a separate secondary zone. Its seam frequency and surface texture are not resolved well enough to distinguish EPDM from modified bitumen, so use `epdm_or_mod_bit` for that zone instead of extending the main EPDM label or inventing a white single-ply section.
+
 ## Recommended AI Output
 
 For every analyzed building, return:

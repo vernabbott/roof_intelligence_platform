@@ -21,6 +21,12 @@ EDITING_MIGRATION = (
     / "migrations"
     / "20260722000300_add_report_edit_requests_and_authenticated_access.sql"
 )
+FEEDBACK_MIGRATION = (
+    PROJECT_DIR
+    / "supabase"
+    / "migrations"
+    / "20260726000100_add_reviewed_processing_feedback.sql"
+)
 
 
 class RoofIntelligenceReportingMigrationTests(unittest.TestCase):
@@ -116,6 +122,33 @@ class RoofIntelligenceEditingMigrationTests(unittest.TestCase):
         self.assertIn("grant execute on function", self.sql)
         self.assertNotIn("roof_intelligence_report_revisions_authenticated_update", self.sql)
         self.assertNotIn("roof_intelligence_report_revisions_authenticated_delete", self.sql)
+
+
+class RoofIntelligenceProcessingFeedbackMigrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.sql = FEEDBACK_MIGRATION.read_text(encoding="utf-8").lower()
+
+    def test_adds_opt_in_reviewed_feedback_queue(self):
+        self.assertIn("submit_for_future_processing boolean", self.sql)
+        self.assertIn("create table public.roof_intelligence_processing_feedback", self.sql)
+        for status in ("pending_review", "approved", "rejected", "applied"):
+            self.assertIn(status, self.sql)
+        self.assertIn("before_values jsonb", self.sql)
+        self.assertIn("corrected_values jsonb", self.sql)
+        self.assertIn("property_identity jsonb", self.sql)
+        self.assertIn("imagery_identity jsonb", self.sql)
+
+    def test_review_and_application_are_service_role_only(self):
+        self.assertIn("review_roof_intelligence_processing_feedback", self.sql)
+        self.assertIn("mark_roof_intelligence_processing_feedback_applied", self.sql)
+        self.assertIn("to service_role", self.sql)
+        self.assertIn("from public, anon, authenticated", self.sql)
+
+    def test_application_requires_named_workflow_artifacts(self):
+        self.assertIn("applied_workflow_version", self.sql)
+        self.assertIn("applied_artifacts", self.sql)
+        self.assertIn("jsonb_array_length(applied_artifacts) > 0", self.sql)
 
 
 if __name__ == "__main__":

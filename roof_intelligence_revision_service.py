@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from render_roof_intelligence_snapshot import render_snapshot
+from roof_processing_feedback import build_feedback_candidate, save_feedback_record
 from roof_intelligence_snapshot import (
     create_manual_revision,
     refresh_recommendation,
@@ -27,8 +28,14 @@ def regenerate_revision(
     output_path: Path,
     report_image: Path | None = None,
     apply_square_footage_to_future: bool = False,
+    submit_for_future_processing: bool = False,
+    feedback_directory: Path | None = None,
 ) -> dict[str, Any]:
     """Create, render, verify, and return the next complete revision snapshot."""
+    if submit_for_future_processing and feedback_directory is None:
+        raise ValueError(
+            "feedback_directory is required when submit_for_future_processing is enabled"
+        )
     revised = create_manual_revision(
         parent_snapshot,
         edits,
@@ -59,12 +66,22 @@ def regenerate_revision(
     with target.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
-    return {
+    result = {
         "snapshot": revised,
         "report_path": str(target),
         "pdf_size": target.stat().st_size,
         "pdf_checksum": digest.hexdigest(),
     }
+    if submit_for_future_processing:
+        feedback = build_feedback_candidate(
+            parent_snapshot,
+            revised,
+            requested_by=created_by,
+        )
+        feedback_path = save_feedback_record(feedback, feedback_directory)
+        result["processing_feedback"] = feedback
+        result["processing_feedback_path"] = str(feedback_path)
+    return result
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,6 +94,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--change-reason", required=True)
     parser.add_argument("--report-image", type=Path)
     parser.add_argument("--apply-square-footage-to-future", action="store_true")
+    parser.add_argument("--submit-for-future-processing", action="store_true")
+    parser.add_argument("--feedback-directory", type=Path)
     return parser.parse_args()
 
 
@@ -97,6 +116,8 @@ def main() -> int:
         output_path=args.output_pdf,
         report_image=args.report_image,
         apply_square_footage_to_future=args.apply_square_footage_to_future,
+        submit_for_future_processing=args.submit_for_future_processing,
+        feedback_directory=args.feedback_directory,
     )
     args.output_snapshot.parent.mkdir(parents=True, exist_ok=True)
     args.output_snapshot.write_text(
@@ -110,6 +131,7 @@ def main() -> int:
                 "report_path": result["report_path"],
                 "pdf_size": result["pdf_size"],
                 "pdf_checksum": result["pdf_checksum"],
+                "processing_feedback_path": result.get("processing_feedback_path"),
             }
         )
     )

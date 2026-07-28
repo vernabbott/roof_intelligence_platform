@@ -77,24 +77,31 @@ def duplicate_content_errors(config) -> list[str]:
 def known_building_identity_errors(config) -> list[str]:
     seen: dict[tuple[str, str, str], tuple[str, Path]] = {}
     errors: list[str] = []
-    for roof_type, item in config.roof_types.items():
-        for reference in item.reference_images:
-            for identity in reference.known_buildings:
-                key = (
-                    re.sub(r"[^a-z0-9]+", "", identity.parcel_id.lower()),
-                    re.sub(r"[^a-z0-9]+", "", identity.image_source.lower()),
-                    re.sub(r"[^0-9]+", "", identity.image_date),
+    reference_groups = [
+        (roof_type, reference)
+        for roof_type, item in config.roof_types.items()
+        for reference in item.reference_images
+    ] + [
+        (correction.roof_type, correction.reference)
+        for correction in config.known_building_corrections
+    ]
+    for roof_type, reference in reference_groups:
+        for identity in reference.known_buildings:
+            key = (
+                re.sub(r"[^a-z0-9]+", "", identity.parcel_id.lower()),
+                re.sub(r"[^a-z0-9]+", "", identity.image_source.lower()),
+                re.sub(r"[^0-9]+", "", identity.image_date),
+            )
+            previous = seen.get(key)
+            if previous:
+                previous_type, previous_path = previous
+                errors.append(
+                    "duplicate known-building identity: "
+                    f"{previous_type}/{previous_path.name} and "
+                    f"{roof_type}/{reference.path.name}"
                 )
-                previous = seen.get(key)
-                if previous:
-                    previous_type, previous_path = previous
-                    errors.append(
-                        "duplicate known-building identity: "
-                        f"{previous_type}/{previous_path.name} and "
-                        f"{roof_type}/{reference.path.name}"
-                    )
-                else:
-                    seen[key] = (roof_type, reference.path)
+            else:
+                seen[key] = (roof_type, reference.path)
     return errors
 
 

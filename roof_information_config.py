@@ -127,6 +127,7 @@ ROOF_TYPE_LABELS = {
     "pvc_or_coating": "PVC or Coated Roof",
     "epdm_or_mod_bit": "EPDM or Modified Bitumen",
     "mod_bit_or_coating": "Modified Bitumen or Coated Roof",
+    "mod_bit_coating_or_tar_and_gravel": "Modified Bitumen, Coated Roof, or Tar and Gravel",
     "mod_bit_or_tar_and_gravel": "Modified Bitumen or Tar and Gravel",
     "ballasted_or_tar_and_gravel": "Ballasted or Tar and Gravel",
     "unknown": "Unknown",

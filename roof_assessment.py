@@ -213,6 +213,96 @@ def normalize_tree_evidence(analysis: dict) -> None:
         factors["overhanging_trees_or_debris"] = False
 
 
+PONDING_EVIDENCE_PHRASES = (
+    "standing water",
+    "retained water",
+    "visible water",
+    "basin-shaped",
+    "sediment ring",
+    "tide ring",
+    "algae-like",
+    "blocked drain",
+    "drainage concentration",
+    "recurring wet area",
+)
+PONDING_NEGATION_PHRASES = (
+    "no affirmative ponding",
+    "no distinct ponding",
+    "no clear ponding",
+    "no clear retained water",
+    "no clear standing water",
+    "no retained water",
+    "no standing water",
+    "no visible ponding",
+    "ponding is not visible",
+    "without ponding evidence",
+)
+PONDING_OBSERVATION_PHRASES = (
+    "ponding",
+    "ponded",
+    "standing water",
+    "retained water",
+    "visible water",
+    "water accumulation",
+)
+
+
+def normalize_ponding_evidence(analysis: dict) -> None:
+    """Remove ponding from all-metal roofs and reject unsupported flags elsewhere."""
+    factors = analysis.get("visual_risk_factors")
+    if not isinstance(factors, dict):
+        return
+
+    zones = [zone for zone in analysis.get("roof_zones") or [] if isinstance(zone, Mapping)]
+    zone_types = {_text(zone.get("roof_type")).lower() for zone in zones if _text(zone.get("roof_type"))}
+    top_level_type = _text(analysis.get("roof_type")).lower()
+    all_metal = zone_types == {"metal"} or (not zone_types and top_level_type == "metal")
+    if all_metal:
+        def includes_ponding(value: object) -> bool:
+            text = _sentence(value).lower()
+            return any(phrase in text for phrase in PONDING_OBSERVATION_PHRASES)
+
+        factors["suspected_ponding"] = False
+        factors["notes"] = [
+            _sentence(value)
+            for value in factors.get("notes") or []
+            if _sentence(value) and not includes_ponding(value)
+        ]
+        analysis["observations"] = [
+            _sentence(value)
+            for value in analysis.get("observations") or []
+            if _sentence(value) and not includes_ponding(value)
+        ]
+        for zone in zones:
+            zone["supporting_cues"] = [
+                _sentence(value)
+                for value in zone.get("supporting_cues") or []
+                if _sentence(value) and not includes_ponding(value)
+            ]
+        return
+
+    if factors.get("suspected_ponding") is not True:
+        return
+
+    evidence: list[str] = [
+        _sentence(value) for value in factors.get("notes") or [] if _sentence(value)
+    ]
+    evidence.extend(
+        _sentence(value) for value in analysis.get("observations") or [] if _sentence(value)
+    )
+    for zone in analysis.get("roof_zones") or []:
+        if not isinstance(zone, dict):
+            continue
+        evidence.extend(
+            _sentence(value) for value in zone.get("supporting_cues") or [] if _sentence(value)
+        )
+    evidence_text = " ".join(evidence).lower()
+    has_negative = any(phrase in evidence_text for phrase in PONDING_NEGATION_PHRASES)
+    has_affirmative = any(phrase in evidence_text for phrase in PONDING_EVIDENCE_PHRASES)
+    if has_negative or not has_affirmative:
+        factors["suspected_ponding"] = False
+
+
 def confirmed_tree_proximity(analysis: Mapping) -> bool:
     factors = analysis.get("visual_risk_factors")
     return isinstance(factors, Mapping) and factors.get("tree_proximity") == "confirmed"
@@ -363,6 +453,7 @@ __all__ = [
     "formatted_capture_date",
     "normalize_zone_materials",
     "normalize_tree_evidence",
+    "normalize_ponding_evidence",
     "risk_level_for_score",
     "score_from_breakdown",
 ]

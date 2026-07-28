@@ -10,6 +10,8 @@ Use this guide to identify modified bitumen roofing from aerial, drone, and insp
 
 Image-only classification is an informed assessment. Dark color alone does not establish modified bitumen. Use roll width, lap frequency, surface texture, flashings, and patches together, and preserve broader alternatives when resolution is inadequate.
 
+A light or off-white roof is not automatically single-ply. When the image is clear enough to show a continuous roof field but no broad repeated membrane-sheet seam grid, welded details, or thermoplastic flashing construction is visible, compare smooth modified bitumen and coating directly. A muted monolithic or weathered surface may support **Modified Bitumen or Coated Roof** even when roll laps are below aerial resolution. If the image is too soft or obstructed to show seams reliably, record the seam pattern as unresolved instead of claiming that seams are absent.
+
 ## Typical Characteristics
 
 - Reinforced asphalt sheet modified with polymer, commonly SBS or APP
@@ -70,13 +72,25 @@ low-profile sheet seams and generally do not form a continuous raised-rib field
 across multiple sloped planes. Treat coating wear, rust staining, and repairs as
 condition evidence after identifying the underlying ribbed metal geometry.
 
+A shallow metal gable may also appear nearly flat from directly overhead. When a
+continuous center ridge divides two planes and dense narrow ribs terminate
+perpendicular to that ridge on both sides, favor metal over modified bitumen.
+Bright rectangular repairs that occupy uniform rib-to-rib panel modules and align
+with the manufactured grid support replaced metal panel sections. Modified-
+bitumen patches can be rectangular, but they do not preserve a rigid raised ridge
+with a repeated perpendicular-rib assembly.
+
 ### EPDM
 
 EPDM is often black or dark gray but commonly uses much broader sheets and fewer field seams. Its surface looks smoother and more rubber-like, with tape or adhesive seams and rubber flashing details. At aerial resolution, use the controlled type `epdm_or_mod_bit`, displayed as **EPDM or Modified Bitumen**, if seam frequency and texture are not resolved. Do not guess between the two.
 
+Determine the material family from the continuous roof field rather than from bright seams, repair bands, rooftop equipment, or glare. On a mixed building, keep a lighter gray attached membrane section separate from a confirmed dark EPDM main roof. If that secondary field lacks resolved granules, asphaltic texture, or narrow roll-lap geometry, retain `epdm_or_mod_bit`; bright localized details do not establish white single-ply.
+
 ### Built-Up Roofing or Tar-and-Gravel
 
 Gravel-surfaced BUR usually lacks an exposed regular roll-lap grid because aggregate covers the plies. Smooth BUR may look asphaltic and patch-heavy but may not show the consistent factory-roll pattern of modified bitumen. Exact distinction can require close texture or records.
+
+When a tan, weathered low-slope field could also be coated and the aerial image resolves neither roll laps, coating application evidence, nor embedded aggregate, retain the controlled three-way type `mod_bit_coating_or_tar_and_gravel`, displayed as **Modified Bitumen, Coated Roof, or Tar and Gravel**. Tan color alone is insufficient to select BUR.
 
 ### TPO or PVC
 
@@ -188,6 +202,22 @@ roll geometry and weathered asphaltic surface character together rather than
 classifying the material from its light color alone. Tree canopy obscures part of
 the left edge, and the image does not by itself establish active leakage, trapped
 moisture, or the exact assembly.
+
+### Modified Bitumen Reference 7 — Flat Weathered Membrane Misread as Metal
+
+![Weathered flat modified bitumen roof with patches and ponding evidence](images/mod_bit_005.png)
+
+This reviewer-confirmed modified bitumen roof is a continuous flat membrane
+field with dense horizontal roll and lap banding. The lines are low-profile and
+irregularly weathered; they do not form raised ribs, rigid panels, directional
+metal sheen, crisp sloped planes, or metal ridge and edge construction. Small
+rectangular gray and black areas interrupting the predominant field, including
+the lower-left area, are localized applied repair patches rather than metal
+panels. Soft-edged tan areas near the upper roof do not have manufactured
+straight boundaries and support recurring moisture retention or ponding. The
+combined widespread aging, repeated repairs, and ponding evidence indicates a
+roof likely near the end of its service life with elevated leakage risk, while
+active leakage and wet insulation still require onsite confirmation.
 
 ## Recommended AI Output
 

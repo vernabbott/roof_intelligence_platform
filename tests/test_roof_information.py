@@ -92,6 +92,22 @@ class RoofInformationConfigurationTests(unittest.TestCase):
                 }
                 self.assertEqual(roof_system_card_text(analysis), "Primary: PVC or Coated Roof")
 
+    def test_three_way_asphaltic_ambiguity_is_displayed_verbatim(self) -> None:
+        analysis = {
+            "roof_zones": [
+                {
+                    "location": "entire roof",
+                    "roof_type": "mod_bit_coating_or_tar_and_gravel",
+                    "estimated_area_percentage": 100,
+                    "confidence": 60,
+                }
+            ]
+        }
+        self.assertEqual(
+            roof_type_card_text(analysis),
+            "Primary: Modified Bitumen, Coated Roof, or Tar and Gravel",
+        )
+
     def test_manual_display_override_takes_precedence_over_roof_zones(self) -> None:
         analysis = {
             "_manual_roof_type_display": "Primary: EPDM",

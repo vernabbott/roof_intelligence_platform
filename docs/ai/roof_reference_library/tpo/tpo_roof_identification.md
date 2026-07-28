@@ -131,16 +131,26 @@ Coated asphalt roofs may be white but often show narrower roll widths, heavier l
 
 Metal panels have repeated raised ribs or standing seams, rigid panel geometry, and often a directional sheen. TPO seams are low-profile lap lines and the membrane conforms to the substrate.
 
+In this workflow, `metal` requires both dense narrow manufactured raised ribs and visible rigid pitched geometry, normally a peak or raised ridge with ribs running perpendicular downslope. A broad rectangular seam grid on a smooth, apparently flat white field is consistent with single-ply sheets and must not be promoted to metal from color, building shape, or reference-image similarity.
+
 ## Mixed-Roof Buildings
 
 Do not assign one roof type to the whole building until every visible roof zone has been evaluated.
 
-1. Divide the roof into contiguous zones using parapets, expansion joints, elevation changes, additions, material transitions, and abrupt changes in color or seam geometry.
+1. Divide the roof into contiguous zones using parapets, expansion joints, elevation changes, additions, and material transitions supported by seam, edge, texture, slope, or construction evidence. Color variation by itself is not a material boundary.
 2. Evaluate the surface, seam pattern, flashings, and edges inside each zone independently.
 3. Assign a separate roof-type label and confidence to each zone.
 4. Estimate each zone's share of the visible roof area when practical.
 5. Record transition boundaries and any zones hidden by equipment, shadow, water, vegetation, or image limits.
 6. If TPO, PVC, and coating cannot be separated visually, use `tpo_pvc_or_coating` with reduced confidence and preserve the specific materials as alternatives.
+
+### Continuous Weathered White Roof Fields
+
+A single continuous light-colored roof may contain bright white, cream, tan, gray, or darker areas because of UV aging, chalking, dirt retention, weather exposure, previous repairs, moisture, or drainage patterns. Keep it as one roof-material zone when the same field surface, seam layout, perimeter construction, slope, and elevation continue across those color changes.
+
+Do not create a second roof type from mottling, longitudinal weathering bands, isolated discoloration, or a large diffuse darker area alone. Record those features as visible condition observations. Suspect ponding only when the pattern also follows a low area or drainage path or shows retained water, sediment rings, algae-like growth, or concentrated staining. Do not infer leakage or wet insulation from color alone.
+
+Heavy aging may erase the seam and surface evidence needed to prove TPO. When the roof is clearly within the aged white single-ply/coating family but TPO, PVC, and coating cannot be separated, classify the continuous section as `tpo_pvc_or_coating`, displayed as **White Single-Ply or Coated Roof**, at no more than 60% confidence. This is one ambiguous material zone, not several roof types.
 
 Example result:
 

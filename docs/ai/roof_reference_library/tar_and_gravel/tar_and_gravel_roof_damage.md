@@ -108,7 +108,18 @@ Extensive membrane or ply failure, active water intrusion, widespread saturated 
 
 ### Aging
 
-No tar-and-gravel aging example images have been added yet.
+#### Aging Example 1 — Poor Tan Roof with Three-Way Material Ambiguity
+
+![Poor tan low-slope roof with white penetration repairs](../../../../aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png)
+
+This reviewer-confirmed condition example retains **Modified Bitumen, Coated
+Roof, or Tar and Gravel** because the tan field does not resolve embedded
+aggregate, modified-bitumen roll laps, or coating application evidence. White
+material around several equipment curbs and penetrations is consistent with
+localized patching or prior repair activity. Widespread weathering and the
+number of repaired details support the **Poor** condition rating and elevated
+leakage potential, but aerial imagery does not prove active leakage or wet
+insulation. Confirm the material assembly and moisture condition onsite.
 
 ### Ponding
 

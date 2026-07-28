@@ -14,7 +14,29 @@ The required roof-type output is always the canonical type `metal`. A possible s
 
 Faint parallel lines, tonal bands, or rectangular image artifacts on a dark low-slope roof are not enough to establish metal. When rigid panel geometry, raised-rib shadows, and metal edge details are unresolved, do not guess metal. If the surface is plausibly a dark membrane, use EPDM, modified bitumen, or **EPDM or Modified Bitumen** according to the visible evidence and retain metal only as an alternative.
 
-Soft overhead imagery may still support the generic metal family when narrow parallel panel lines are dense, regular, continuous across most of the roof field, and reinforced by rigid rectangular geometry and crisp perimeter construction. In that situation, keep confidence low to moderate because the image does not resolve rib height, attachment, or subtype. Do not apply this exception to a dark, flat, matte roof with only a few faint lines and no metal edge evidence; that appearance favors a membrane.
+Irregular weathering streaks, coating wear, runoff marks, patch edges, and roller or application marks are also not metal ribs. These marks break, change width or direction, and lack a repeated raised shadow. Require a coherent manufactured pattern reinforced by rigid roof planes, slope alignment, or metal perimeter/ridge construction before selecting metal. A weathered asphaltic-looking field without those cues should be compared directly with modified bitumen and coating.
+
+For this aerial workflow, metal requires two target-image findings together: dense, narrow, uniformly repeated manufactured raised ribs and rigid pitched geometry, normally a visible peak or raised ridge with those ribs running perpendicular downslope. Do not use a rectangular footprint, white color, dense linear banding, broad sheet seams, attachment rows, or similarity to a metal reference as a substitute. A continuous smooth flat field without both required findings is not metal.
+
+A shallow metal gable can look nearly flat in direct overhead imagery. Look for a
+continuous raised ridge line through the roof center and dense narrow ribs that
+terminate perpendicular to it on the opposing planes. This combined geometry is
+stronger than color or apparent pitch alone. Uniform contrasting rectangles that
+occupy one or more complete panel-bay widths and align exactly with the rib grid
+may be replaced metal panel sections. Treat those as prior repair evidence while
+preserving the metal classification. Irregular membrane patches do not establish
+a rigid center ridge or a repeated perpendicular rib assembly.
+
+Metal roofs commonly drain over exposed eaves or rakes and may show gutters,
+downspouts, or crisp shedding-edge trim instead of an enclosing perimeter
+parapet. When the image clearly resolves those edges, they reinforce a pitched
+metal interpretation because they agree with the ridge, opposing planes, and
+downslope rib direction. Apparent parapet absence alone is not a material test:
+overhead imagery may hide a low wall or coping, and membrane roofs can also use
+exposed drainage edges. Never override contradictory field geometry from this
+edge cue or report parapet presence or absence as a customer-facing conclusion.
+
+Soft overhead imagery does not create a metal exception. If the image cannot resolve raised rib height, narrow repeated spacing, pitched planes, and the ridge-to-rib relationship, do not classify the zone as metal. Retain metal only as an alternative when appropriate and select the supported membrane/coating family.
 
 ## Typical Characteristics
 
@@ -23,6 +45,7 @@ Soft overhead imagery may still support the generic metal family when narrow par
 - Panels commonly run in the primary drainage direction
 - Directional reflection or sheen that changes with sun and viewing angle
 - Crisp ridges, hips, valleys, eaves, rakes, and edge trim
+- Exposed water-shedding eaves or rakes, sometimes with gutters or downspouts, when clearly resolved
 - Common on both low-slope commercial roofs and steeper architectural roofs
 - Factory or field-applied finishes may be white, gray, black, bronze, red, green, or other colors
 
@@ -83,9 +106,28 @@ Confidence increases when a roof zone shows:
 
 Single-ply membranes can have long parallel laps, but those seams are low profile and usually do not cast consistent rib shadows. Membranes conform to insulation and substrate irregularities; metal forms rigid panels with crisp trim. Mechanically attached membrane rows can resemble metal from poor imagery, so confirm rib height, spacing, and drainage direction.
 
+A smooth white, apparently flat field with broad rectangular sheet divisions and no visible peak ridge or perpendicular narrow raised ribs belongs in the white single-ply/coating family. Do not reinterpret its broad seam grid as fine metal ribbing because a bright metal reference has similar color or building proportions.
+
 ### Coated Metal Roof
 
 A coating does not change the metal substrate classification when panel ribs and rigid geometry remain visible. Report both layers when supported, such as `coated metal roof`. Heavy restoration systems may soften rib detail or bridge fasteners and endlaps.
+
+### Translucent Fiberglass Skylight Panels
+
+Industrial metal roofs may replace selected metal panel segments with translucent
+fiberglass panels that admit daylight. From above, these commonly appear as
+narrow rectangles with the same orientation, similar dimensions, regular spacing,
+and alignment within the surrounding rib grid. They may be only slightly darker
+than a bright roof and may lack a prominent raised curb. An organized repeated
+array supports skylights; isolated rectangles with irregular sizes, locations, or
+overlap edges are more likely repairs, coating variation, equipment, or artifacts.
+
+When fiberglass skylight panels are supported, report `skylights: present`. For a
+silicone-restoration recommendation, explicitly exclude the light-transmitting
+panel faces from coating and require them to be masked and protected. Coating the
+faces would make them opaque and can make these fragile fall-through hazards more
+difficult to identify. Field inspection must evaluate panel and perimeter-seal
+condition and establish safe access and treatment details.
 
 ### Ribbed Wall Panels, Canopies, and Mechanical Screens
 
@@ -227,6 +269,76 @@ manufactured rib geometry. Modified-bitumen roll laps are low-profile sheet
 seams and do not create this full-field raised-rib pattern across sloped,
 rigidly defined planes. Treat discoloration and repairs as condition evidence,
 not as evidence that the substrate is asphaltic.
+
+### Metal Reference 9 — Bright Ribbed Metal Misread as White Single-Ply
+
+![Bright white ribbed metal roof with penetration repair patches](images/metal_009.png)
+
+This reviewer-confirmed metal roof has a bright white finish that can trigger a
+superficial white-membrane comparison. The decisive evidence is the dense set of
+fine, straight, uniformly spaced ribs continuing across the full rigid roof
+plane. This is manufactured metal-panel geometry, not the broader low-profile
+sheet layout expected from TPO or PVC. Localized contrasting patches are visible
+around several penetrations and curbs. Those patches indicate prior repair
+activity and elevated flashing or seal leakage risk but do not prove an active
+leak. The continuous metal field may be a strong silicone-restoration candidate
+if onsite inspection, moisture and adhesion testing, substrate compatibility,
+repairs, preparation, and manufacturer requirements are satisfied.
+
+### Metal Reference 10 — Ribbed Metal with Fiberglass Skylight Panels
+
+![Bright ribbed metal roof with evenly spaced fiberglass skylight panels](images/metal_010.png)
+
+This reviewer-confirmed example shows a dominant bright ribbed metal roof and a
+smaller attached modified-bitumen section at the west side. Across the main metal
+field, numerous narrow rectangular panels are arranged in repeated rows. Their
+consistent size, orientation, spacing, and alignment with the surrounding ribs
+identify them as translucent fiberglass skylight panels rather than patches or
+coating wear. Report skylights as present. Any silicone-restoration scope must
+mask, protect, and exclude their light-transmitting faces while separately
+inspecting their perimeter seals and condition.
+
+### Metal Reference 11 — Shallow Center Ridge and Replaced Panel Sections
+
+![Metal roof with center ridge, perpendicular ribs, and panel-section replacements](images/metal_011.png)
+
+This reviewer-confirmed metal roof was previously confused with modified bitumen
+or coating. The full field contains very narrow, uniformly spaced ribs. A raised
+ridge runs across the center, dividing two shallow planes, while the ribs on each
+plane terminate perpendicular to it. Several bright rectangles have consistent
+panel-bay widths and align precisely with the rib grid; these are replacement
+metal panel sections and evidence of prior repairs, not irregular membrane
+patches. The center-ridge, opposing-plane, and panel-module evidence together
+establish metal even though the roof appears nearly flat from overhead.
+
+### Metal Reference 12 — Two-Tone Pitched Metal with Fiberglass Skylights
+
+![Two-tone pitched metal roof with peak ridge, perpendicular ribs, and fiberglass skylights](images/metal_012.png)
+
+This reviewer-confirmed roof is entirely metal. A clear peak ridge divides two
+pitched planes, and dense straight manufactured ribs run perpendicular to that
+ridge across both the blue-gray and cream sections. The continuous ridge,
+matching pitch, rib direction, spacing, and rigid panel construction establish
+one material despite the strong color boundary. The two tones may reflect
+different installation dates, panel replacement, coating age, finish, or
+weathering, but the aerial image does not establish which explanation is
+correct. Repeated lighter rectangular panels preserve consistent dimensions,
+spacing, orientation, and alignment within the rib grid; identify them as
+translucent fiberglass skylights rather than separate roofing or repairs.
+
+### Metal Reference 13 — Bright White Ridged Metal Misread as Single-Ply
+
+![Bright white metal roof with a center ridge and perpendicular ribs](images/metal_013.png)
+
+This reviewer-confirmed metal roof was incorrectly divided into a dominant
+white single-ply field and a small metal section. The entire bright-white roof
+is one continuous metal-panel assembly. A center ridge crosses the roof and
+divides two shallow pitched planes, while dense narrow manufactured ribs run
+perpendicular downslope from the ridge across both planes. The exposed eave and
+rake geometry is configured to shed water and may include gutter or drainage-edge
+details, reinforcing the pitched construction. That edge evidence is supportive,
+not decisive by itself: the ridge, opposing planes, and perpendicular full-field
+ribs establish metal, and the white finish must not create a membrane zone.
 
 ## Recommended AI Output
 

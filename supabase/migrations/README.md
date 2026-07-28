@@ -42,6 +42,7 @@ are future feature work and require a separate migration and design review.
 | `20260722000100_create_roof_intelligence_reporting.sql` | Applied and verified July 22, 2026 |
 | `20260722000200_prepare_roof_intelligence_cutover.sql` | Applied and verified July 22, 2026 |
 | `20260722000300_add_report_edit_requests_and_authenticated_access.sql` | Prepared locally; not applied |
+| `20260726000100_add_reviewed_processing_feedback.sql` | Prepared locally; not applied; depends on `20260722000300` |
 
 This migration creates empty centralized Roof Intelligence job, property,
 report, immutable revision, asset, notification, and county-health structures,
@@ -68,3 +69,11 @@ function. PCS and PilotPoint do not call these structures yet.
 The report-edit migration adds an authenticated, idempotent request queue and
 read-only report-history policies for the future PCS web application. It must
 be rehearsed in the separate staging project before it is applied elsewhere.
+
+The reviewed-processing-feedback migration adds an explicit opt-in flag to
+report edits and creates a human-reviewed correction queue. Pending and
+approved records do not affect report generation. A correction becomes usable
+only after an authorized maintainer records the workflow version and durable
+guide, manifest, reference, known-building, prompt, or evaluation artifacts
+that apply it. Review and application functions are restricted to the service
+role.

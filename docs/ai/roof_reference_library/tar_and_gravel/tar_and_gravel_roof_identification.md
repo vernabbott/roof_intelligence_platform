@@ -78,6 +78,8 @@ Decorative aggregate may occupy isolated amenity, drainage, or planting zones ra
 
 Rough coating, alligatoring, patching, and image noise may resemble fine gravel. Confirm individually resolved aggregate and consistent roof-wide distribution.
 
+For a tan, weathered low-slope field where the image cannot resolve embedded aggregate, modified-bitumen roll laps, or coating application evidence, use `mod_bit_coating_or_tar_and_gravel`, displayed as **Modified Bitumen, Coated Roof, or Tar and Gravel**. Do not promote tar-and-gravel from tan color or localized white repair material alone.
+
 ## BUR Versus Ballasted Membrane Comparison
 
 | Feature | Tar-and-gravel/BUR tendency | Ballasted membrane tendency |

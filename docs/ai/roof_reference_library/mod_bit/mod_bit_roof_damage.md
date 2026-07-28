@@ -130,9 +130,54 @@ as strong aerial evidence of significant aging. Tree canopy partly obscures the
 left roof edge, and aerial imagery alone does not establish active leakage,
 trapped moisture, remaining service life, or the exact modified-bitumen assembly.
 
+#### Aging Example 3 — Heavily Weathered Modified Bitumen or Coated Roof
+
+![Heavily weathered modified bitumen or coated roof with no distinct ponding](../../../../aerial_images_single_address/arapahoe_aerials/197133208014-arapahoe_aerials-ai-target.png)
+
+This reviewer-confirmed condition example shows one continuous light roof field
+with heavy irregular streaking, chalking, surface wear, and widespread
+deterioration. The linear marks change width, spacing, continuity, and direction;
+they have no repeated raised-rib shadows, rigid panel planes, or metal edge
+construction, so they must not be interpreted as metal ribs. Roll laps and
+coating application details are unresolved, so the material remains **Modified
+Bitumen or Coated Roof**. The deterioration indicates elevated risk of localized
+surface failure and leakage, but aerial imagery cannot confirm active leaks or
+their locations. No retained water, basin-shaped staining, sediment ring, or
+other distinct ponding evidence is visible.
+
+#### Aging Example 4 — Probable End-of-Service-Life Modified Bitumen
+
+![Heavily aged modified bitumen roof with patches and ponding evidence](images/mod_bit_005.png)
+
+This flat modified bitumen field shows widespread gray-black weathering,
+low-profile roll and lap banding, and numerous localized rectangular repair
+patches. Irregular soft-edged tan areas near the upper roof are consistent with
+recurring moisture retention or ponding rather than a separate material. Taken
+together, the extensive aging, repeated repairs, and ponding evidence support a
+probable end-of-service-life assessment and elevated leakage risk. Do not claim
+an active leak location or wet insulation without onsite inspection and moisture
+testing.
+
+#### Aging Example 5 — Poor Tan Roof with Three-Way Material Ambiguity
+
+![Poor tan low-slope roof with white penetration repairs](../../../../aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png)
+
+This reviewer-confirmed condition example has one continuous tan, matte,
+weathered low-slope field whose aerial details do not separate modified
+bitumen, a coated roof, and tar-and-gravel/BUR. White material is concentrated
+around multiple equipment curbs and penetrations in patterns consistent with
+localized patching or prior repairs. Together with widespread weathering, the
+repair concentration supports the **Poor** rating and elevated leakage risk,
+but it does not confirm active leaks, wet insulation, or exact failure
+locations. Verify the assembly and moisture condition onsite.
+
 ### Ponding
 
-No modified-bitumen ponding example images have been added yet.
+Aging Example 4 also demonstrates aerial ponding evidence: irregular,
+basin-shaped tan discoloration with soft boundaries near the upper roof field.
+This differs from rectangular patches, manufactured sheet edges, and straight
+metal panels. Confirm drainage, retained moisture, and insulation condition
+onsite.
 
 ### Leaking
 

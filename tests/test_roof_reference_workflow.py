@@ -22,7 +22,7 @@ from generate_roof_intelligence_reports import (
     roof_candidate_schema,
 )
 from scripts.evaluate_roof_reference_library import evaluate
-from roof_assessment import canonical_observations
+from roof_assessment import canonical_observations, normalize_ponding_evidence
 from roof_reference_config import (
     DEFAULT_ROOF_REFERENCE_MANIFEST_PATH,
     ROOF_REFERENCE_FEATURE_ENV,
@@ -36,6 +36,8 @@ from roof_reference_config import (
 from roof_reference_retrieval import (
     NORMALIZED_IMAGE_SIZE,
     find_known_building_match,
+    known_building_stage1,
+    lock_known_building_material,
     normalized_roof_image,
     rank_references,
     retrieve_reference_bundle,
@@ -46,7 +48,8 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
     def test_manifest_loads_all_approved_types_and_images(self) -> None:
         config = load_roof_reference_config()
         self.assertEqual(len(config.roof_types), 7)
-        self.assertEqual(sum(len(item.reference_image_paths) for item in config.roof_types.values()), 37)
+        self.assertEqual(sum(len(item.reference_image_paths) for item in config.roof_types.values()), 44)
+        self.assertEqual(len(config.known_building_corrections), 4)
         for item in config.roof_types.values():
             self.assertTrue(item.guide_path.is_file())
             self.assertFalse(any("damage" in path.name for path in item.reference_image_paths))
@@ -55,9 +58,17 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
         metal = config.roof_types["metal"]
         self.assertIn("metal_007.png", [path.name for path in metal.reference_image_paths])
         self.assertIn("metal_008.png", [path.name for path in metal.reference_image_paths])
+        self.assertIn("metal_009.png", [path.name for path in metal.reference_image_paths])
+        self.assertIn("metal_010.png", [path.name for path in metal.reference_image_paths])
+        self.assertIn("metal_011.png", [path.name for path in metal.reference_image_paths])
+        self.assertIn("metal_012.png", [path.name for path in metal.reference_image_paths])
+        self.assertIn("metal_013.png", [path.name for path in metal.reference_image_paths])
+        epdm = config.roof_types["epdm"]
+        self.assertIn("epdm_005.png", [path.name for path in epdm.reference_image_paths])
         mod_bit_bundle = load_reference_bundle(["mod_bit"], config)
         self.assertEqual(mod_bit_bundle[0].image_paths, config.roof_types["mod_bit"].reference_image_paths)
         self.assertIn("aging_002.png", [path.name for path in mod_bit_bundle[0].image_paths])
+        self.assertIn("mod_bit_005.png", [path.name for path in mod_bit_bundle[0].image_paths])
 
     def test_obsolete_stage2_subset_is_rejected(self) -> None:
         document = DEFAULT_ROOF_REFERENCE_MANIFEST_PATH.read_text(encoding="utf-8")
@@ -158,6 +169,32 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
         selected = select_reference_types(stage1, config)
         self.assertIn("mod_bit", selected)
         self.assertIn("ballasted", selected)
+        self.assertNotIn("metal", selected)
+
+    def test_white_single_ply_candidates_do_not_pull_metal_through_helper_comparisons(self) -> None:
+        config = load_roof_reference_config()
+        stage1 = {
+            "roof_zones": [
+                {
+                    "visual_evidence": {
+                        "color_family": "white",
+                        "seam_pattern": "broad low-profile sheet lines",
+                        "surface_texture": "smooth",
+                        "ridge_pattern": "not_apparent",
+                    },
+                    "candidates": [
+                        {"roof_type": "tpo", "confidence": 55},
+                        {"roof_type": "pvc", "confidence": 52},
+                        {"roof_type": "coating", "confidence": 50},
+                    ],
+                }
+            ]
+        }
+        selected = select_reference_types(stage1, config)
+        self.assertIn("tpo", selected)
+        self.assertIn("mod_bit", selected)
+        self.assertIn("ballasted", selected)
+        self.assertNotIn("metal", selected)
 
     def test_pvc_reference_is_loaded_when_pvc_is_a_leading_candidate(self) -> None:
         config = load_roof_reference_config()
@@ -283,7 +320,8 @@ class RoofReferenceRequestTests(unittest.TestCase):
             [
                 "tpo", "tpo_pvc_or_coating", "pvc", "epdm", "ballasted", "metal", "mod_bit",
                 "tar_and_gravel", "coating", "pvc_or_coating",
-                "epdm_or_mod_bit", "mod_bit_or_coating", "mod_bit_or_tar_and_gravel",
+                "epdm_or_mod_bit", "mod_bit_or_coating", "mod_bit_coating_or_tar_and_gravel",
+                "mod_bit_or_tar_and_gravel",
                 "ballasted_or_tar_and_gravel", "unknown",
             ],
         )
@@ -317,6 +355,8 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("cap that zone confidence and overall ai_confidence at 60", text)
         self.assertIn("first record the required visual_evidence fields", text)
         self.assertIn("do not treat TPO as a conclusion merely because the surface is white", text)
+        self.assertIn("Do not split one continuous field into multiple material zones from color variation", text)
+        self.assertIn("controlled tpo_pvc_or_coating result", text)
         self.assertIn("Fundamental Material Priors", text)
         self.assertIn("Uniform gray pixels are outside the target building", text)
         self.assertEqual(len(images), 1)
@@ -346,8 +386,18 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIn("use pvc_or_coating", openai_text)
         self.assertIn("Favor pvc_or_coating over TPO", openai_text)
         self.assertIn("tan matte weathered asphaltic field may be modified bitumen", openai_text)
-        self.assertIn("strongly favor metal over modified bitumen", openai_text)
+        self.assertIn("strongly favors metal", openai_text)
         self.assertIn("full-field raised-rib pattern", openai_text)
+        self.assertIn("continuous raised center ridge", openai_text)
+        self.assertIn("exposed eaves or rakes", openai_text)
+        self.assertIn("Apparent parapet absence alone is not a material test", openai_text)
+        self.assertIn("reference-similarity score must never override", openai_text)
+        self.assertIn("Metal is gated by two required target-image findings", openai_text)
+        self.assertIn("replaced metal panel sections", openai_text)
+        self.assertIn("For every all-metal roof, set suspected_ponding to false", openai_text)
+        self.assertIn("Do not create multiple material zones from color variation", openai_text)
+        self.assertIn("do not infer leaks or wet insulation from color alone", openai_text)
+        self.assertIn("use tpo_pvc_or_coating for one aged light-colored zone", openai_text)
         self.assertIn("Compare the target against every supplied reference image", openai_text)
         self.assertIn("reviewer-confirmed same-building match", openai_text)
         self.assertIn("REVIEWER-CONFIRMED POSITIVE", openai_text)
@@ -431,10 +481,12 @@ class RoofReferenceRequestTests(unittest.TestCase):
 
     def test_offline_reference_evaluation_guards_corrected_building(self) -> None:
         result = evaluate()
-        self.assertEqual(result["total_cases"], 2)
+        self.assertEqual(result["total_cases"], 13)
         self.assertEqual(result["classification_accuracy"], 1.0)
+        self.assertEqual(result["zone_classification_accuracy"], 1.0)
         self.assertEqual(result["known_match_accuracy"], 1.0)
         self.assertEqual(result["top1_retrieval_accuracy"], 1.0)
+        self.assertEqual(result["condition_tags_accuracy"], 1.0)
 
     def test_tejon_known_building_is_locked_as_metal(self) -> None:
         row = {
@@ -446,6 +498,328 @@ class RoofReferenceRequestTests(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertEqual(match.roof_type, "metal")
         self.assertEqual(match.reference.path.name, "metal_008.png")
+
+    def test_bright_white_ridged_known_building_is_locked_as_one_metal_zone(self) -> None:
+        row = {
+            "Parcel Number": "197133204015",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "metal")
+        self.assertEqual(match.reference.path.name, "metal_013.png")
+        stage1 = known_building_stage1(match)
+        self.assertEqual(stage1["building_classification"], "single")
+        self.assertEqual(
+            [zone["candidates"][0]["roof_type"] for zone in stage1["roof_zones"]],
+            ["metal"],
+        )
+
+    def test_arapahoe_known_building_preserves_confirmed_mixed_roof_zones(self) -> None:
+        row = {
+            "Parcel Number": "197128342001",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "epdm")
+        self.assertEqual(match.reference.path.name, "epdm_005.png")
+        stage1 = known_building_stage1(match)
+        self.assertEqual(stage1["building_classification"], "mixed")
+        self.assertEqual(
+            [zone["candidates"][0]["roof_type"] for zone in stage1["roof_zones"]],
+            ["epdm", "epdm_or_mod_bit"],
+        )
+        analysis = self.final_analysis()
+        lock_known_building_material(analysis, match)
+        self.assertEqual(analysis["building_classification"], "mixed")
+        self.assertEqual(
+            [zone["roof_type"] for zone in analysis["roof_zones"]],
+            ["epdm", "epdm_or_mod_bit"],
+        )
+        self.assertEqual([zone["estimated_area_percentage"] for zone in analysis["roof_zones"]], [75, 25])
+
+    def test_weathered_arapahoe_correction_locks_ambiguity_and_no_ponding(self) -> None:
+        row = {
+            "Parcel Number": "197133208014",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "mod_bit_or_coating")
+        self.assertEqual(match.reference.path.name, "197133208014-arapahoe_aerials-ai-target.png")
+        stage1 = known_building_stage1(match)
+        self.assertEqual(stage1["roof_zones"][0]["candidates"][0]["roof_type"], "mod_bit_or_coating")
+        analysis = self.final_analysis()
+        analysis["visual_risk_factors"]["suspected_ponding"] = True
+        lock_known_building_material(analysis, match)
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "mod_bit_or_coating")
+        self.assertFalse(analysis["visual_risk_factors"]["suspected_ponding"])
+        self.assertTrue(analysis["visual_risk_factors"]["dark_staining_or_discoloration"])
+
+    def test_ponding_requires_affirmative_visible_evidence(self) -> None:
+        analysis = {
+            "visual_risk_factors": {
+                "suspected_ponding": True,
+                "notes": ["Heavy aging and weathering, but no distinct ponding is visible."],
+            },
+            "observations": ["Widespread streaking and surface deterioration."],
+            "roof_zones": [],
+        }
+        normalize_ponding_evidence(analysis)
+        self.assertFalse(analysis["visual_risk_factors"]["suspected_ponding"])
+
+        supported = {
+            "visual_risk_factors": {
+                "suspected_ponding": True,
+                "notes": ["A basin-shaped stain with a sediment ring is visible near the drain."],
+            },
+            "observations": [],
+            "roof_zones": [],
+        }
+        normalize_ponding_evidence(supported)
+        self.assertTrue(supported["visual_risk_factors"]["suspected_ponding"])
+
+    def test_ridged_metal_suppresses_ponding_without_direct_water(self) -> None:
+        analysis = {
+            "roof_structure": {"slope_form": "low_slope"},
+            "roof_zones": [
+                {
+                    "roof_type": "metal",
+                    "supporting_cues": [
+                        "A center ridge divides opposing shallow roof planes.",
+                        "Weathering follows the ribs with possible drainage concentration.",
+                    ],
+                }
+            ],
+            "visual_risk_factors": {
+                "suspected_ponding": True,
+                "notes": ["Weathering and tonal variation are visible."],
+            },
+            "observations": [],
+        }
+        normalize_ponding_evidence(analysis)
+        self.assertFalse(analysis["visual_risk_factors"]["suspected_ponding"])
+
+    def test_all_metal_roof_suppresses_even_direct_ponding_language(self) -> None:
+        analysis = {
+            "roof_structure": {"slope_form": "pitched"},
+            "roof_zones": [{"roof_type": "metal", "supporting_cues": []}],
+            "visual_risk_factors": {
+                "suspected_ponding": True,
+                "notes": [
+                    "Visible standing water is retained at a blocked gutter.",
+                    "A damaged gutter is visible along the south edge.",
+                ],
+            },
+            "observations": ["Potential ponding is visible near the gutter."],
+        }
+        normalize_ponding_evidence(analysis)
+        self.assertFalse(analysis["visual_risk_factors"]["suspected_ponding"])
+        self.assertEqual(
+            analysis["visual_risk_factors"]["notes"],
+            ["A damaged gutter is visible along the south edge."],
+        )
+        self.assertEqual(analysis["observations"], [])
+
+    def test_mixed_metal_and_membrane_roof_can_retain_membrane_ponding(self) -> None:
+        analysis = {
+            "roof_zones": [
+                {"roof_type": "metal", "supporting_cues": []},
+                {"roof_type": "mod_bit", "supporting_cues": ["Standing water is visible on the flat membrane."]},
+            ],
+            "visual_risk_factors": {
+                "suspected_ponding": True,
+                "notes": ["Standing water is visible on the flat membrane zone."],
+            },
+            "observations": [],
+        }
+        normalize_ponding_evidence(analysis)
+        self.assertTrue(analysis["visual_risk_factors"]["suspected_ponding"])
+
+    def test_light_monolithic_arapahoe_correction_is_not_white_single_ply(self) -> None:
+        row = {
+            "Parcel Number": "197133204008",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "mod_bit_or_coating")
+        stage1 = known_building_stage1(match)
+        self.assertEqual(stage1["building_classification"], "single")
+        self.assertEqual(stage1["roof_zones"][0]["candidates"][0]["roof_type"], "mod_bit_or_coating")
+        analysis = self.final_analysis()
+        lock_known_building_material(analysis, match)
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "mod_bit_or_coating")
+        self.assertNotIn("tpo_pvc_or_coating", [zone["roof_type"] for zone in analysis["roof_zones"]])
+
+    def test_tan_patched_arapahoe_correction_preserves_three_way_ambiguity(self) -> None:
+        row = {
+            "Parcel Number": "197133206005",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "mod_bit_coating_or_tar_and_gravel")
+        self.assertEqual(
+            match.reference.path.name,
+            "197133206005-arapahoe_aerials-ai-target.png",
+        )
+        stage1 = known_building_stage1(match)
+        self.assertEqual(
+            [candidate["roof_type"] for candidate in stage1["roof_zones"][0]["candidates"]],
+            ["mod_bit_coating_or_tar_and_gravel", "mod_bit", "coating", "tar_and_gravel"],
+        )
+        analysis = self.final_analysis()
+        lock_known_building_material(analysis, match)
+        self.assertEqual(
+            analysis["roof_zones"][0]["roof_type"],
+            "mod_bit_coating_or_tar_and_gravel",
+        )
+        self.assertEqual(
+            analysis["roof_zones"][0]["alternatives"],
+            ["mod_bit", "coating", "tar_and_gravel"],
+        )
+        self.assertIn("poor_condition", match.reference.condition_tags)
+        self.assertIn("penetration_patching", match.reference.condition_tags)
+
+    def test_tejon_white_low_slope_roof_locks_single_ply_or_coating_not_metal(self) -> None:
+        row = {
+            "Parcel Number": "197133206006",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "tpo_pvc_or_coating")
+        stage1 = known_building_stage1(match)
+        self.assertEqual(stage1["roof_zones"][0]["candidates"][0]["roof_type"], "tpo_pvc_or_coating")
+        analysis = self.final_analysis()
+        analysis["roof_zones"][0]["roof_type"] = "metal"
+        lock_known_building_material(analysis, match)
+        normalize_reference_analysis(analysis)
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "tpo_pvc_or_coating")
+        self.assertEqual(analysis["roof_zones"][0]["alternatives"], ["tpo", "pvc", "coating"])
+        cues = " ".join(analysis["roof_zones"][0]["supporting_cues"]).lower()
+        self.assertIn("no visible peak ridge", cues)
+        self.assertNotIn("metal", analysis["roof_type"].lower())
+
+    def test_college_mod_bit_match_locks_material_patches_and_ponding(self) -> None:
+        row = {
+            "Parcel Number": "197128306037",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "mod_bit")
+        self.assertEqual(match.reference.path.name, "mod_bit_005.png")
+        self.assertIn("patching", match.reference.condition_tags)
+        self.assertIn("probable_end_of_service_life", match.reference.condition_tags)
+        analysis = self.final_analysis()
+        analysis["visual_risk_factors"]["suspected_ponding"] = False
+        lock_known_building_material(analysis, match)
+        normalize_reference_analysis(analysis)
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "mod_bit")
+        self.assertTrue(analysis["visual_risk_factors"]["suspected_ponding"])
+        self.assertTrue(analysis["visual_risk_factors"]["dark_staining_or_discoloration"])
+        cues = " ".join(analysis["roof_zones"][0]["supporting_cues"]).lower()
+        self.assertIn("patch", cues)
+        self.assertIn("end-of-service-life", cues)
+
+    def test_yale_bright_ribbed_roof_locks_metal_and_repair_evidence(self) -> None:
+        row = {
+            "Parcel Number": "197133204009",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "metal")
+        self.assertEqual(match.reference.path.name, "metal_009.png")
+        self.assertIn("penetration_patching", match.reference.condition_tags)
+        self.assertIn("silicone_restoration_candidate", match.reference.condition_tags)
+        analysis = self.final_analysis()
+        lock_known_building_material(analysis, match)
+        normalize_reference_analysis(analysis)
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "metal")
+        cues = " ".join(analysis["roof_zones"][0]["supporting_cues"]).lower()
+        self.assertIn("ribs", cues)
+        self.assertIn("patches", cues)
+        self.assertIn("silicone restoration", cues)
+
+    def test_tejon_fiberglass_panels_lock_skylights_and_coating_exclusion(self) -> None:
+        row = {
+            "Parcel Number": "197128300071",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "metal")
+        self.assertEqual(match.reference.path.name, "metal_010.png")
+        self.assertIn("fiberglass_skylight_panels", match.reference.condition_tags)
+        analysis = self.final_analysis()
+        lock_known_building_material(analysis, match)
+        normalize_reference_analysis(analysis)
+        self.assertEqual(
+            [zone["roof_type"] for zone in analysis["roof_zones"]],
+            ["metal", "mod_bit"],
+        )
+        self.assertEqual(analysis["roof_structure"]["skylights"], "present")
+        self.assertIn("exclude and protect", analysis["recommendation"].lower())
+        cues = " ".join(analysis["roof_zones"][0]["supporting_cues"]).lower()
+        self.assertIn("fiberglass skylights", cues)
+        self.assertIn("exclude", cues)
+
+    def test_vallejo_center_ridge_and_panel_repairs_lock_metal(self) -> None:
+        row = {
+            "Parcel Number": "197133206001",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "metal")
+        self.assertEqual(match.reference.path.name, "metal_011.png")
+        self.assertIn("panel_section_replacements", match.reference.condition_tags)
+        analysis = self.final_analysis()
+        analysis["visual_risk_factors"]["suspected_ponding"] = True
+        lock_known_building_material(analysis, match)
+        normalize_reference_analysis(analysis)
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "metal")
+        self.assertFalse(analysis["visual_risk_factors"]["suspected_ponding"])
+        cues = " ".join(analysis["roof_zones"][0]["supporting_cues"]).lower()
+        self.assertIn("center ridge", cues)
+        self.assertIn("perpendicular", cues)
+        self.assertIn("replaced metal panel sections", cues)
+
+    def test_two_tone_pitched_roof_locks_one_metal_zone_and_skylights(self) -> None:
+        row = {
+            "Parcel Number": "197128311005",
+            "Primary Aerial Source": "Arapahoe County Aerials",
+            "Primary Aerial Photo Date": "2024-03-01",
+        }
+        match = find_known_building_match(row, self.config)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.roof_type, "metal")
+        self.assertEqual(match.reference.path.name, "metal_012.png")
+        self.assertIn("fiberglass_skylight_panels", match.reference.condition_tags)
+        analysis = self.final_analysis()
+        lock_known_building_material(analysis, match)
+        normalize_reference_analysis(analysis)
+        self.assertEqual([zone["roof_type"] for zone in analysis["roof_zones"]], ["metal"])
+        self.assertEqual(analysis["roof_zones"][0]["estimated_area_percentage"], 100)
+        self.assertEqual(analysis["roof_structure"]["skylights"], "present")
+        cues = " ".join(analysis["roof_zones"][0]["supporting_cues"]).lower()
+        self.assertIn("color", cues)
+        self.assertIn("perpendicular", cues)
+        self.assertIn("fiberglass skylights", cues)
 
     def final_analysis(self) -> dict:
         return {

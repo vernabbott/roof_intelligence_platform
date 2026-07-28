@@ -36,6 +36,7 @@ class KnownBuildingMatch:
     basis: str = "parcel+imagery_source+imagery_date"
 
     def as_trace(self) -> dict:
+        confirmed_zone_types = [zone.roof_type for zone in self.reference.confirmed_zones]
         return {
             "matched": True,
             "roof_type": self.roof_type,
@@ -46,6 +47,8 @@ class KnownBuildingMatch:
             "basis": self.basis,
             "reviewer_confirmed": self.reference.reviewer_confirmed,
             "material_locked": True,
+            "confirmed_zone_types": confirmed_zone_types,
+            "condition_tags": list(self.reference.condition_tags),
         }
 
 
@@ -78,25 +81,32 @@ def find_known_building_match(row: dict, config: RoofReferenceConfig) -> KnownBu
         return None
 
     matches: list[KnownBuildingMatch] = []
-    for roof_type, item in config.roof_types.items():
-        for reference in item.reference_images:
-            if not reference.reviewer_confirmed:
-                continue
-            for identity in reference.known_buildings:
-                if (
-                    _normalized_text(identity.parcel_id) == parcel
-                    and _normalized_text(identity.image_source) == source
-                    and _normalized_date(identity.image_date) == image_date
-                ):
-                    matches.append(
-                        KnownBuildingMatch(
-                            roof_type=roof_type,
-                            reference=reference,
-                            parcel_id=identity.parcel_id,
-                            image_source=identity.image_source,
-                            image_date=identity.image_date,
-                        )
+    reference_groups = [
+        (roof_type, reference)
+        for roof_type, item in config.roof_types.items()
+        for reference in item.reference_images
+    ] + [
+        (correction.roof_type, correction.reference)
+        for correction in config.known_building_corrections
+    ]
+    for roof_type, reference in reference_groups:
+        if not reference.reviewer_confirmed:
+            continue
+        for identity in reference.known_buildings:
+            if (
+                _normalized_text(identity.parcel_id) == parcel
+                and _normalized_text(identity.image_source) == source
+                and _normalized_date(identity.image_date) == image_date
+            ):
+                matches.append(
+                    KnownBuildingMatch(
+                        roof_type=roof_type,
+                        reference=reference,
+                        parcel_id=identity.parcel_id,
+                        image_source=identity.image_source,
+                        image_date=identity.image_date,
                     )
+                )
     if len(matches) > 1:
         labels = ", ".join(f"{match.roof_type}:{match.reference.path.name}" for match in matches)
         raise RuntimeError(f"Conflicting reviewer-confirmed known-building matches: {labels}")
@@ -104,6 +114,43 @@ def find_known_building_match(row: dict, config: RoofReferenceConfig) -> KnownBu
 
 
 def known_building_stage1(match: KnownBuildingMatch) -> dict:
+    if match.reference.confirmed_zones:
+        zones = []
+        for zone in match.reference.confirmed_zones:
+            candidate_types = [zone.roof_type, *zone.alternatives]
+            zones.append(
+                {
+                    "zone_id": zone.zone_id,
+                    "location": zone.location,
+                    "estimated_area_percentage": zone.estimated_area_percentage,
+                    "visual_evidence": {
+                        "color_family": "reviewer_confirmed",
+                        "seam_pattern": "reviewer_confirmed",
+                        "surface_texture": "reviewer_confirmed",
+                        "perimeter_stone_transition": "not_applicable",
+                        "ridge_pattern": "not_applicable",
+                        "evidence_summary": "; ".join(zone.cues),
+                    },
+                    "candidates": [
+                        {
+                            "roof_type": roof_type,
+                            "confidence": 100 if index == 0 else 60,
+                            "evidence": "Reviewer-confirmed zone label for this exact image.",
+                        }
+                        for index, roof_type in enumerate(candidate_types)
+                    ],
+                    "limitations": list(zone.limitations),
+                }
+            )
+        return {
+            "building_classification": "mixed" if len(zones) > 1 else "single",
+            "roof_zones": zones,
+            "overall_limitations": [
+                "Roof material zones are reviewer-confirmed for this exact building and imagery date."
+            ],
+            "known_building_match": match.as_trace(),
+        }
+
     cue_text = "; ".join(match.reference.cues) or "Reviewer-confirmed reference identity match."
     return {
         "building_classification": "single",
@@ -143,6 +190,56 @@ def known_building_stage1(match: KnownBuildingMatch) -> dict:
 
 
 def lock_known_building_material(analysis: dict, match: KnownBuildingMatch) -> None:
+    tags = set(match.reference.condition_tags)
+    factors = analysis.setdefault("visual_risk_factors", {})
+    if isinstance(factors, dict):
+        if "no_distinct_ponding" in tags:
+            factors["suspected_ponding"] = False
+        elif "ponding_evidence" in tags:
+            factors["suspected_ponding"] = True
+        if {"heavy_aging", "significant_aging", "weathering"}.intersection(tags):
+            factors["dark_staining_or_discoloration"] = True
+
+    if "skylights_present" in tags:
+        roof_structure = analysis.setdefault("roof_structure", {})
+        if isinstance(roof_structure, dict):
+            roof_structure["skylights"] = "present"
+    if "silicone_coating_exclusion" in tags:
+        exclusion = (
+            "Exclude and protect the translucent fiberglass skylight panel faces from silicone coating "
+            "so they remain light-transmitting and visibly identifiable."
+        )
+        recommendation = str(analysis.get("recommendation") or "").strip()
+        if "skylight panel faces" not in recommendation.lower():
+            analysis["recommendation"] = f"{exclusion} {recommendation}".strip()
+
+    if match.reference.confirmed_zones:
+        locked_zones = []
+        for zone in match.reference.confirmed_zones:
+            locked_zones.append(
+                {
+                    "zone_id": zone.zone_id,
+                    "location": zone.location,
+                    "roof_type": zone.roof_type,
+                    "estimated_area_percentage": zone.estimated_area_percentage,
+                    "confidence": 100,
+                    "supporting_cues": list(zone.cues),
+                    "alternatives": list(zone.alternatives),
+                    "limitations": list(zone.limitations),
+                }
+            )
+        analysis["building_classification"] = "mixed" if len(locked_zones) > 1 else "single"
+        analysis["roof_zones"] = locked_zones
+        analysis["possible_roof_systems"] = [
+            {
+                "system": zone.roof_type,
+                "confidence": 100,
+                "evidence": zone.cues[0] if zone.cues else "Reviewer-confirmed roof zone.",
+            }
+            for zone in match.reference.confirmed_zones
+        ]
+        return
+
     existing_zones = analysis.get("roof_zones") or []
     existing_types = [
         str(zone.get("roof_type") or "")

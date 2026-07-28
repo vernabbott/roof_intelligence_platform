@@ -20,6 +20,8 @@ Accurate damage identification helps prioritize inspection and maintenance befor
 - Fine cracking, crazing, brittleness, abrasion, and exposed reinforcement
 - Deteriorated welds, sealants, patches, flashings, and termination details
 - Concentrated wear along walk paths, around service areas, and near rooftop equipment
+- Broad or mottled transitions among white, cream, tan, and gray within one continuous field, without a construction boundary
+- Long weathering bands or diffuse darker areas that continue across the same seam layout and should be assessed as condition variation rather than a second roof material
 
 ### Ponding
 
@@ -27,6 +29,12 @@ Accurate damage identification helps prioritize inspection and maintenance befor
 - Dark staining, sediment rings, algae, biological growth, and dirt accumulation
 - Blocked drains or scuppers and water retained after surrounding areas have dried
 - Membrane discoloration, wrinkling, or accelerated surface deterioration within ponding zones
+
+Color variation alone does not confirm ponding. Require supporting drainage evidence such as visible retained water, a basin-shaped low area, sediment or tide rings, algae-like growth, or staining concentrated around drains and scuppers. Without those cues, describe the condition as weathering, aging, soiling, or indeterminate discoloration and recommend field verification when material identification or moisture condition remains uncertain.
+
+### Aging That Obscures Roof Type
+
+An old light-colored roof can remain one continuous material section even when its field varies noticeably from bright white to cream, tan, or gray. If seams, flashing details, and original surface character are softened or obscured by age and weathering, do not force TPO chemistry and do not split the field into different materials. Use **White Single-Ply or Coated Roof** (`tpo_pvc_or_coating`) for material reporting when TPO, PVC, and coating remain plausible, and assess the mottling separately as visible aging/weathering or possible drainage-related discoloration.
 
 ### Leaking
 

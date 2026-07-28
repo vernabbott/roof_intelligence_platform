@@ -118,11 +118,61 @@ Extensive panel loss or uplift, widespread perforation, unstable components, maj
 
 ### Ponding
 
-No metal-roof ponding example images have been added yet.
+Do not report ponding as an observation or visible-risk factor on an all-metal
+roof. Set `suspected_ponding` to false and remove ponding, standing-water, and
+retained-water wording from customer-facing observations and notes. Metal panel
+roofs are treated as shedding water by design. A separately visible gutter,
+drain, deformation, or structural concern may be documented by its physical
+name without labeling the roof field as ponded.
 
 ### Leaking
 
-No metal-roof leaking example images have been added yet.
+### Penetration Repair Patches and Leak Potential
+
+![Bright metal roof with localized repair patches around penetrations](images/metal_009.png)
+
+Several localized contrasting patches surround penetrations and curbs on this
+bright ribbed metal roof. Their concentration at leak-prone details supports a
+history of repair activity and elevated flashing or seal leakage risk. Do not
+state that active leakage is present from patches alone; confirm current
+moisture entry, fastener and seam condition, and insulation moisture onsite.
+When the panels remain sound, dry, compatible, and repairable, this type of
+continuous metal field may warrant evaluation for silicone restoration after
+required repairs, preparation, moisture testing, and adhesion testing.
+
+### Fiberglass Skylight Protection During Restoration
+
+![Metal roof with repeated translucent fiberglass skylight panels](images/metal_010.png)
+
+The evenly spaced narrow rectangles aligned within this metal roof's rib grid are
+translucent fiberglass skylight panels. They are roof openings and fall-through
+hazards, not coating wear or repair patches. A silicone-restoration scope must
+exclude the light-transmitting faces and require masking and protection so the
+panels remain translucent and visibly identifiable. Inspect panel brittleness,
+cracking, fasteners, perimeter seals, and safe-access requirements onsite; aerial
+imagery alone cannot establish those conditions.
+
+![Two-tone pitched metal roof with rib-aligned fiberglass skylights](images/metal_012.png)
+
+This second reviewer-confirmed example shows lighter rectangular fiberglass
+skylight panels repeated across a blue-gray metal roof section. Their organized
+spacing and alignment within the same perpendicular rib grid distinguish them
+from random repairs and from the adjacent cream-colored metal section. The
+color transition does not establish damage or a different roofing material.
+Inspect the skylight panels, perimeter seals, and safe-access requirements
+onsite, and exclude and protect their light-transmitting faces during any
+silicone-restoration work.
+
+### Replaced Metal Panel Sections
+
+![Metal roof with uniform-width replacement panel sections](images/metal_011.png)
+
+The contrasting bright rectangles on this roof align with the narrow rib grid and
+occupy consistent panel-bay widths. That modular alignment supports replacement
+metal panel sections and prior repair activity rather than random membrane
+patching. Document the repaired locations and inspect endlaps, sidelaps, fasteners,
+sealants, and the reason for replacement onsite. Aerial imagery does not establish
+whether the repaired sections are currently watertight.
 
 ### Hail Damage
 
