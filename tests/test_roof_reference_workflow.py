@@ -1,4 +1,5 @@
 # © PilotPoint IQ Roof Intelligence All rights reserved
+import copy
 import os
 import tempfile
 import unittest
@@ -6,7 +7,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from generate_roof_intelligence_reports import (
+    apply_metal_membrane_resolution,
     build_gemini_reference_parts,
+    build_openai_metal_membrane_content,
     build_openai_candidate_content,
     build_openai_reference_content,
     apply_visual_risk_adjustment,
@@ -14,21 +17,31 @@ from generate_roof_intelligence_reports import (
     call_openai_reference_analysis,
     encode_image_data_url,
     image_mime_type,
+    initial_reference_analysis_schema,
     load_or_create_analysis,
     maximum_retrieved_reference_images,
+    metal_membrane_disagreements,
+    metal_membrane_review_zones,
+    metal_membrane_resolution_schema,
+    material_review_recommendation,
     normalize_reference_analysis,
     reference_images_per_type,
+    reference_comparison_reasons,
     reference_analysis_schema,
     roof_candidate_schema,
+    select_single_call_reference_types,
+    uncertainty_aware_roof_description,
 )
 from scripts.evaluate_roof_reference_library import evaluate
 from roof_assessment import canonical_observations, normalize_ponding_evidence
 from roof_reference_config import (
     DEFAULT_ROOF_REFERENCE_MANIFEST_PATH,
+    METAL_MEMBRANE_RESOLVER_ENV,
     ROOF_REFERENCE_FEATURE_ENV,
     RoofReferenceConfigurationError,
     load_reference_bundle,
     load_roof_reference_config,
+    metal_membrane_resolver_enabled,
     roof_reference_feature_enabled,
     roof_reference_trace,
     select_reference_types,
@@ -112,6 +125,12 @@ class RoofReferenceConfigurationTests(unittest.TestCase):
             self.assertTrue(roof_reference_feature_enabled(True))
         with patch.dict(os.environ, {ROOF_REFERENCE_FEATURE_ENV: "true"}, clear=False):
             self.assertTrue(roof_reference_feature_enabled(False))
+
+    def test_metal_membrane_resolver_is_an_explicit_canary(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(metal_membrane_resolver_enabled())
+        with patch.dict(os.environ, {METAL_MEMBRANE_RESOLVER_ENV: "1"}, clear=True):
+            self.assertTrue(metal_membrane_resolver_enabled())
 
     def test_retrieval_limits_have_bounded_production_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -309,6 +328,11 @@ class RoofReferenceRequestTests(unittest.TestCase):
             },
         )
         visual_risk = final_schema["properties"]["visual_risk_factors"]
+        initial_schema = initial_reference_analysis_schema(self.config)
+        initial_zone = initial_schema["properties"]["roof_zones"]["items"]
+        self.assertIn("visual_evidence", initial_zone["required"])
+        self.assertIn("candidates", initial_zone["required"])
+        self.assertIn("overall_limitations", initial_schema["required"])
         self.assertIn("tree_proximity", visual_risk["required"])
         self.assertEqual(
             visual_risk["properties"]["tree_proximity"]["enum"],
@@ -325,6 +349,103 @@ class RoofReferenceRequestTests(unittest.TestCase):
                 "ballasted_or_tar_and_gravel", "unknown",
             ],
         )
+
+    def test_metal_membrane_resolver_triggers_only_on_stage_disagreement(self) -> None:
+        stage1 = {
+            "roof_zones": [
+                {"zone_id": "A", "candidates": [{"roof_type": "metal", "confidence": 72}]},
+                {"zone_id": "B", "candidates": [{"roof_type": "tpo", "confidence": 70}]},
+            ]
+        }
+        analysis = {
+            "roof_zones": [
+                {"zone_id": "A", "roof_type": "mod_bit"},
+                {"zone_id": "B", "roof_type": "tpo_pvc_or_coating"},
+            ]
+        }
+        self.assertEqual(metal_membrane_disagreements(stage1, analysis), ["A"])
+
+    def test_metal_membrane_resolver_reviews_paired_low_confidence_zone(self) -> None:
+        stage1 = {
+            "roof_zones": [
+                {
+                    "zone_id": "A",
+                    "candidates": [{"roof_type": "tpo", "confidence": 58}],
+                }
+            ]
+        }
+        analysis = {
+            "roof_zones": [
+                {"zone_id": "A", "roof_type": "tpo_pvc_or_coating", "confidence": 60}
+            ]
+        }
+        self.assertEqual(metal_membrane_disagreements(stage1, analysis), [])
+        self.assertEqual(metal_membrane_review_zones(stage1, analysis), ["A"])
+        stage1["roof_zones"][0]["candidates"][0]["confidence"] = 75
+        self.assertEqual(metal_membrane_review_zones(stage1, analysis), [])
+
+    def test_metal_membrane_request_is_material_only_and_uses_original_color_target(self) -> None:
+        analysis = self.final_analysis()
+        analysis["roof_zones"][0]["roof_type"] = "metal"
+        bundle = load_reference_bundle(["metal", "tpo"], self.config, images_per_type=1)
+        content = build_openai_metal_membrane_content(
+            {}, self.target_path, {"roof_zones": [self.stage1["roof_zones"][0]]}, analysis, ["A"], bundle
+        )
+        text = "\n".join(item.get("text", "") for item in content)
+        images = [item for item in content if item.get("type") == "input_image"]
+        self.assertIn("Decide only the material family", text)
+        self.assertIn("Do not assess condition", text)
+        self.assertIn("ORIGINAL-COLOR TARGET ROOF IMAGE", text)
+        self.assertIn("return indeterminate", text)
+        self.assertEqual(len(images), 3)
+        resolver_zone = metal_membrane_resolution_schema()["properties"]["resolutions"]["items"]
+        self.assertIn("rigid_geometry", resolver_zone["required"])
+
+    def test_confident_resolver_changes_only_material_family(self) -> None:
+        analysis = self.final_analysis()
+        analysis["roof_zones"][0]["roof_type"] = "metal"
+        resolution = {
+            "resolutions": [
+                {
+                    "zone_id": "A",
+                    "family": "membrane",
+                    "roof_type": "tpo_pvc_or_coating",
+                    "confidence": 84,
+                    "rib_evidence": "low_profile_or_surface_marks",
+                    "rigid_geometry": "not_supported",
+                    "membrane_evidence": "supported",
+                    "decisive_cues": ["Broad low-profile sheet seams cross a flexible flat field."],
+                    "limitations": ["Exact membrane chemistry is unresolved."],
+                }
+            ]
+        }
+        trace = apply_metal_membrane_resolution(analysis, resolution, ["A"])
+        self.assertEqual(trace["status"], "applied")
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "tpo_pvc_or_coating")
+        self.assertEqual(analysis["roof_zones"][0]["alternatives"], ["metal"])
+        self.assertEqual(analysis["roof_type"], "Primary: White Single-Ply or Coated Roof")
+
+    def test_low_confidence_resolver_preserves_stage2(self) -> None:
+        analysis = self.final_analysis()
+        analysis["roof_zones"][0]["roof_type"] = "metal"
+        resolution = {
+            "resolutions": [
+                {
+                    "zone_id": "A",
+                    "family": "membrane",
+                    "roof_type": "mod_bit",
+                    "confidence": 60,
+                    "rib_evidence": "unresolved",
+                    "rigid_geometry": "unresolved",
+                    "membrane_evidence": "unresolved",
+                    "decisive_cues": ["Available detail does not resolve rib height."],
+                    "limitations": ["Aerial resolution is insufficient."],
+                }
+            ]
+        }
+        trace = apply_metal_membrane_resolution(analysis, resolution, ["A"])
+        self.assertEqual(trace["status"], "no_change")
+        self.assertEqual(analysis["roof_zones"][0]["roof_type"], "metal")
 
     def test_dark_mixed_roof_selection_includes_epdm_mod_bit_pair(self) -> None:
         stage1 = {
@@ -876,6 +997,51 @@ class RoofReferenceRequestTests(unittest.TestCase):
             ],
         }
 
+    def initial_analysis(self, confidence: int = 90) -> dict:
+        analysis = self.final_analysis()
+        analysis["ai_confidence"] = confidence
+        analysis["roof_zones"][0]["confidence"] = confidence
+        candidate_zone = copy.deepcopy(self.stage1["roof_zones"][0])
+        candidate_zone["candidates"][0]["confidence"] = confidence
+        analysis["roof_zones"][0]["visual_evidence"] = candidate_zone["visual_evidence"]
+        analysis["roof_zones"][0]["candidates"] = candidate_zone["candidates"]
+        analysis["overall_limitations"] = []
+        return analysis
+
+    def test_reference_comparison_gate_accepts_only_confident_clear_material(self) -> None:
+        self.assertEqual(reference_comparison_reasons(self.initial_analysis(90)), [])
+        reasons = reference_comparison_reasons(self.initial_analysis(70))
+        self.assertIn("overall_confidence_below_80", reasons)
+        self.assertIn("A_confidence_below_80", reasons)
+        ambiguous = self.initial_analysis(90)
+        ambiguous["roof_zones"][0]["roof_type"] = "epdm_or_mod_bit"
+        self.assertIn(
+            "A_ambiguous_epdm_or_mod_bit",
+            reference_comparison_reasons(ambiguous),
+        )
+
+    def test_single_call_selector_uses_local_similarity_and_reserves_confusion_pair(self) -> None:
+        selected = select_single_call_reference_types(self.config, self.target_path)
+        self.assertLessEqual(len(selected), self.config.maximum_candidate_types)
+        self.assertIn("tpo", selected)
+        self.assertIn("metal", selected)
+        self.assertIn("mod_bit", selected)
+
+    def test_uncertainty_creates_general_description_and_human_review(self) -> None:
+        analysis = self.initial_analysis(60)
+        review = material_review_recommendation(analysis)
+        analysis["material_review"] = review
+        normalize_reference_analysis(analysis)
+        description = uncertainty_aware_roof_description(analysis)
+        self.assertTrue(review["recommended"])
+        self.assertIn("aerially appears consistent", description.lower())
+        self.assertIn("onsite confirmation", description.lower())
+
+    def test_reviewer_confirmed_material_does_not_request_material_review(self) -> None:
+        review = material_review_recommendation(self.initial_analysis(60), reviewer_confirmed=True)
+        self.assertFalse(review["recommended"])
+        self.assertEqual(review["reasons"], [])
+
     def test_reference_analysis_uses_canonical_metal_type_for_roof_type(self) -> None:
         analysis = self.final_analysis()
         analysis["roof_type"] = "standing-seam metal"
@@ -991,19 +1157,57 @@ class RoofReferenceRequestTests(unittest.TestCase):
         )
         self.assertEqual(synchronized["overall_score"], 48)
 
-    def test_openai_two_stage_orchestration_records_combined_usage(self) -> None:
-        stage1_response = {"usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120}}
-        stage2_response = {"usage": {"input_tokens": 300, "output_tokens": 50, "total_tokens": 350}}
+    def test_openai_uncertain_result_uses_one_call_and_recommends_review(self) -> None:
+        response = {"usage": {"input_tokens": 300, "output_tokens": 50, "total_tokens": 350}}
         with patch(
             "generate_roof_intelligence_reports.call_openai_structured",
-            side_effect=[(self.stage1, stage1_response), (self.final_analysis(), stage2_response)],
+            return_value=(self.initial_analysis(70), response),
         ) as api_call:
             result = call_openai_reference_analysis({}, self.target_path, "test-model")
-        self.assertEqual(api_call.call_count, 2)
-        self.assertEqual(result["reference_workflow"]["status"], "completed")
+        self.assertEqual(api_call.call_count, 1)
+        self.assertEqual(result["reference_workflow"]["status"], "completed_single_call")
+        self.assertFalse(result["reference_workflow"]["reference_comparison"]["triggered"])
+        self.assertTrue(result["material_review"]["recommended"])
         self.assertIn("tpo", result["reference_workflow"]["selected_reference_types"])
-        self.assertNotIn("pvc", result["reference_workflow"]["selected_reference_types"])
-        self.assertEqual(result["usage"]["total_tokens"], 470)
+        self.assertIn("metal", result["reference_workflow"]["selected_reference_types"])
+        self.assertIn("mod_bit", result["reference_workflow"]["selected_reference_types"])
+        self.assertEqual(result["usage"]["total_tokens"], 350)
+        self.assertEqual(set(result["usage"]["by_stage"]), {"reference_assisted_analysis"})
+        self.assertIn("onsite confirmation", result["roof_description"].lower())
+
+    def test_openai_confident_result_uses_one_call_without_review(self) -> None:
+        response = {"usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120}}
+        with patch(
+            "generate_roof_intelligence_reports.call_openai_structured",
+            return_value=(self.initial_analysis(90), response),
+        ) as api_call:
+            result = call_openai_reference_analysis({}, self.target_path, "test-model")
+        self.assertEqual(api_call.call_count, 1)
+        self.assertEqual(result["reference_workflow"]["status"], "completed_single_call")
+        self.assertFalse(result["reference_workflow"]["reference_comparison"]["triggered"])
+        self.assertFalse(result["material_review"]["recommended"])
+        self.assertEqual(result["usage"]["total_tokens"], 120)
+        self.assertEqual(set(result["usage"]["by_stage"]), {"reference_assisted_analysis"})
+        self.assertNotIn("visual_evidence", result["roof_zones"][0])
+        self.assertNotIn("candidates", result["roof_zones"][0])
+
+    def test_openai_resolver_flag_does_not_create_another_call(self) -> None:
+        initial = self.initial_analysis(70)
+        with patch.dict(os.environ, {METAL_MEMBRANE_RESOLVER_ENV: "1"}, clear=False), patch(
+            "generate_roof_intelligence_reports.call_openai_structured",
+            return_value=(
+                initial,
+                {"usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120}},
+            ),
+        ) as api_call:
+            result = call_openai_reference_analysis({}, self.target_path, "test-model")
+        self.assertEqual(api_call.call_count, 1)
+        self.assertEqual(result["usage"]["total_tokens"], 120)
+        self.assertEqual(
+            result["reference_workflow"]["metal_membrane_resolver"]["status"],
+            "retired_single_call_workflow",
+        )
+        self.assertNotIn("metal_membrane_resolver", result["usage"]["by_stage"])
 
     def test_openai_known_building_skips_material_inference_and_locks_type(self) -> None:
         row = {
@@ -1020,7 +1224,7 @@ class RoofReferenceRequestTests(unittest.TestCase):
         }
         with patch(
             "generate_roof_intelligence_reports.call_openai_structured",
-            return_value=(self.final_analysis(), stage2_response),
+            return_value=(self.initial_analysis(), stage2_response),
         ) as api_call:
             result = call_openai_reference_analysis(row, target, "test-model")
         self.assertEqual(api_call.call_count, 1)
@@ -1033,17 +1237,34 @@ class RoofReferenceRequestTests(unittest.TestCase):
             self.assertNotIn(process_term, customer_text)
         self.assertIn("modified bitumen", customer_text)
 
-    def test_gemini_two_stage_orchestration_records_trace(self) -> None:
-        stage1_response = {"usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 20, "totalTokenCount": 120}}
-        stage2_response = {"usageMetadata": {"promptTokenCount": 300, "candidatesTokenCount": 50, "totalTokenCount": 350}}
+    def test_gemini_uncertain_result_uses_one_call_and_records_trace(self) -> None:
+        response = {"usageMetadata": {"promptTokenCount": 300, "candidatesTokenCount": 50, "totalTokenCount": 350}}
         with patch(
             "generate_roof_intelligence_reports.call_gemini_structured",
-            side_effect=[(self.stage1, stage1_response), (self.final_analysis(), stage2_response)],
+            return_value=(self.initial_analysis(70), response),
         ) as api_call:
             result = call_gemini_reference_analysis({}, self.target_path, "test-model")
-        self.assertEqual(api_call.call_count, 2)
+        self.assertEqual(api_call.call_count, 1)
         self.assertEqual(result["reference_workflow"]["provider"], "gemini")
-        self.assertEqual(result["usage"]["total_tokens"], 470)
+        self.assertEqual(result["usage"]["total_tokens"], 350)
+        self.assertTrue(result["material_review"]["recommended"])
+
+    def test_gemini_confident_initial_assessment_skips_reference_comparison(self) -> None:
+        response = {
+            "usageMetadata": {
+                "promptTokenCount": 100,
+                "candidatesTokenCount": 20,
+                "totalTokenCount": 120,
+            }
+        }
+        with patch(
+            "generate_roof_intelligence_reports.call_gemini_structured",
+            return_value=(self.initial_analysis(90), response),
+        ) as api_call:
+            result = call_gemini_reference_analysis({}, self.target_path, "test-model")
+        self.assertEqual(api_call.call_count, 1)
+        self.assertFalse(result["reference_workflow"]["reference_comparison"]["triggered"])
+        self.assertEqual(result["usage"]["total_tokens"], 120)
 
 
 class RoofReferenceFallbackTests(unittest.TestCase):

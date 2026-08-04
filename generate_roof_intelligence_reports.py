@@ -48,6 +48,7 @@ from roof_reference_config import (
     RoofReferenceConfig,
     load_reference_bundle,
     load_roof_reference_config,
+    metal_membrane_resolver_enabled,
     relative_project_path,
     roof_reference_feature_enabled,
     roof_reference_trace,
@@ -60,6 +61,7 @@ from roof_reference_retrieval import (
     find_known_building_match,
     known_building_stage1,
     lock_known_building_material,
+    rank_references,
     retrieve_reference_bundle,
 )
 
@@ -78,6 +80,38 @@ YELLOW = "#f3b700"
 RED = "#e53935"
 DEFAULT_PCS_LOGO_PATH = Path(__file__).resolve().parent / "public/images/PCS Logo.png"
 DEFAULT_PILOTPOINTIQ_LOGO_PATH = Path(__file__).resolve().parent / "public/images/PilotPointIQ Logo.png"
+METAL_MEMBRANE_RESOLVER_VERSION = "metal-membrane-v1"
+METAL_MEMBRANE_RESOLVER_MIN_CONFIDENCE = 70
+REFERENCE_COMPARISON_MIN_CONFIDENCE = 80
+REFERENCE_COMPARISON_AMBIGUOUS_TYPES = frozenset(
+    {
+        "tpo_pvc_or_coating",
+        "pvc_or_coating",
+        "epdm_or_mod_bit",
+        "mod_bit_or_coating",
+        "mod_bit_coating_or_tar_and_gravel",
+        "mod_bit_or_tar_and_gravel",
+        "ballasted_or_tar_and_gravel",
+        "unknown",
+    }
+)
+
+SINGLE_CALL_REQUIRED_REFERENCE_TYPES = ("metal", "mod_bit")
+EXPOSED_MEMBRANE_ROOF_TYPES = frozenset(
+    {
+        "tpo",
+        "tpo_pvc_or_coating",
+        "pvc",
+        "epdm",
+        "mod_bit",
+        "coating",
+        "pvc_or_coating",
+        "epdm_or_mod_bit",
+        "mod_bit_or_coating",
+        "mod_bit_coating_or_tar_and_gravel",
+        "mod_bit_or_tar_and_gravel",
+    }
+)
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -771,6 +805,383 @@ def reference_analysis_schema() -> dict:
     return schema
 
 
+def initial_reference_analysis_schema(config: RoofReferenceConfig) -> dict:
+    """Return a complete report schema with Stage 1 material evidence attached."""
+    schema = copy.deepcopy(reference_analysis_schema())
+    candidate_schema = roof_candidate_schema(config)
+    candidate_zone = candidate_schema["properties"]["roof_zones"]["items"]
+    zone = schema["properties"]["roof_zones"]["items"]
+    zone["properties"]["visual_evidence"] = copy.deepcopy(
+        candidate_zone["properties"]["visual_evidence"]
+    )
+    zone["properties"]["candidates"] = copy.deepcopy(
+        candidate_zone["properties"]["candidates"]
+    )
+    zone["required"].extend(["visual_evidence", "candidates"])
+    schema["properties"]["overall_limitations"] = copy.deepcopy(
+        candidate_schema["properties"]["overall_limitations"]
+    )
+    schema["required"].append("overall_limitations")
+    return schema
+
+
+def candidate_analysis_from_initial(analysis: dict) -> dict:
+    """Extract the candidate evidence used to select a focused reference bundle."""
+    zones = []
+    for zone in analysis.get("roof_zones") or []:
+        if not isinstance(zone, dict):
+            continue
+        zones.append(
+            {
+                "zone_id": zone.get("zone_id"),
+                "location": zone.get("location"),
+                "estimated_area_percentage": zone.get("estimated_area_percentage"),
+                "visual_evidence": copy.deepcopy(zone.get("visual_evidence")),
+                "candidates": copy.deepcopy(zone.get("candidates")),
+                "limitations": copy.deepcopy(zone.get("limitations") or []),
+            }
+        )
+    return {
+        "building_classification": analysis.get("building_classification"),
+        "roof_zones": zones,
+        "overall_limitations": copy.deepcopy(analysis.get("overall_limitations") or []),
+    }
+
+
+def strip_initial_material_evidence(analysis: dict) -> dict:
+    """Remove internal Stage 1 evidence from the customer/report analysis payload."""
+    cleaned = copy.deepcopy(analysis)
+    cleaned.pop("overall_limitations", None)
+    for zone in cleaned.get("roof_zones") or []:
+        if isinstance(zone, dict):
+            zone.pop("visual_evidence", None)
+            zone.pop("candidates", None)
+    return cleaned
+
+
+def reference_comparison_reasons(analysis: dict) -> list[str]:
+    """Explain why the initial complete assessment needs a reference comparison."""
+    reasons: list[str] = []
+
+    def add(value: str) -> None:
+        if value not in reasons:
+            reasons.append(value)
+
+    try:
+        overall_confidence = int(analysis.get("ai_confidence") or 0)
+    except (TypeError, ValueError):
+        overall_confidence = 0
+    if overall_confidence < REFERENCE_COMPARISON_MIN_CONFIDENCE:
+        add(f"overall_confidence_below_{REFERENCE_COMPARISON_MIN_CONFIDENCE}")
+    if analysis.get("building_classification") == "indeterminate":
+        add("building_classification_indeterminate")
+
+    for index, zone in enumerate(analysis.get("roof_zones") or []):
+        if not isinstance(zone, dict):
+            add(f"zone_{index + 1}_invalid")
+            continue
+        zone_id = normalize_text(zone.get("zone_id")) or f"zone_{index + 1}"
+        roof_type = normalize_text(zone.get("roof_type")).lower()
+        try:
+            confidence = int(zone.get("confidence") or 0)
+        except (TypeError, ValueError):
+            confidence = 0
+        if confidence < REFERENCE_COMPARISON_MIN_CONFIDENCE:
+            add(f"{zone_id}_confidence_below_{REFERENCE_COMPARISON_MIN_CONFIDENCE}")
+        if roof_type in REFERENCE_COMPARISON_AMBIGUOUS_TYPES:
+            add(f"{zone_id}_ambiguous_{roof_type or 'unknown'}")
+
+        candidates = zone.get("candidates") or []
+        if isinstance(candidates, list) and candidates:
+            try:
+                leading = int(candidates[0].get("confidence") or 0)
+            except (AttributeError, TypeError, ValueError):
+                leading = 0
+            if leading < REFERENCE_COMPARISON_MIN_CONFIDENCE:
+                add(f"{zone_id}_leading_candidate_below_{REFERENCE_COMPARISON_MIN_CONFIDENCE}")
+            if len(candidates) > 1:
+                try:
+                    second = int(candidates[1].get("confidence") or 0)
+                except (AttributeError, TypeError, ValueError):
+                    second = 0
+                if leading - second < 15:
+                    add(f"{zone_id}_candidate_margin_below_15")
+    return reasons
+
+
+def select_single_call_reference_types(
+    config: RoofReferenceConfig,
+    target_path: Path,
+) -> list[str]:
+    """Select reference families locally so material analysis needs one provider call."""
+    _, ranked = rank_references(tuple(config.roof_types), config, target_path)
+    ranked_types: list[str] = []
+    for item in ranked:
+        if item.roof_type not in ranked_types:
+            ranked_types.append(item.roof_type)
+
+    selected = ranked_types[: max(config.maximum_candidate_types - 2, 0)]
+    for key in SINGLE_CALL_REQUIRED_REFERENCE_TYPES:
+        if key in config.roof_types and key not in selected:
+            selected.append(key)
+    for key in ranked_types:
+        if len(selected) >= config.maximum_candidate_types:
+            break
+        if key not in selected:
+            selected.append(key)
+    return selected[: config.maximum_candidate_types]
+
+
+def material_review_recommendation(analysis: dict, reviewer_confirmed: bool = False) -> dict:
+    """Return a non-AI review decision for uncertain single-call results."""
+    reasons = [] if reviewer_confirmed else reference_comparison_reasons(analysis)
+    recommended = bool(reasons)
+    return {
+        "recommended": recommended,
+        "status": "human_review_recommended" if recommended else "not_required",
+        "minimum_confidence": REFERENCE_COMPARISON_MIN_CONFIDENCE,
+        "reasons": reasons,
+        "next_step": (
+            "Confirm roof material through reviewer or onsite inspection; no additional AI call was made."
+            if recommended
+            else "No additional material review indicated by the aerial assessment."
+        ),
+    }
+
+
+def uncertainty_aware_roof_description(analysis: dict) -> str:
+    """Combine material and construction while avoiding false precision."""
+    roof_type = roof_type_card_text(analysis)
+    if roof_type.lower().startswith("primary:"):
+        roof_type = roof_type.split(":", 1)[1].strip()
+    structure = roof_structure_card_text(analysis)
+    review = analysis.get("material_review") or {}
+    if review.get("recommended"):
+        return (
+            f"Aerially appears consistent with {roof_type}; {structure}. "
+            "Exact roof material requires reviewer or onsite confirmation."
+        )
+    return f"{roof_type}; {structure}."
+
+
+def roof_material_family(value: object) -> str:
+    key = normalize_text(value).lower()
+    if key == "metal":
+        return "metal"
+    if key in EXPOSED_MEMBRANE_ROOF_TYPES:
+        return "membrane"
+    return "other"
+
+
+def metal_membrane_disagreements(stage1: dict, analysis: dict) -> list[str]:
+    """Return Stage 2 zone IDs whose material family conflicts with Stage 1."""
+    stage1_zones = [zone for zone in stage1.get("roof_zones") or [] if isinstance(zone, dict)]
+    stage2_zones = [zone for zone in analysis.get("roof_zones") or [] if isinstance(zone, dict)]
+    stage1_by_id = {
+        normalize_text(zone.get("zone_id")): zone
+        for zone in stage1_zones
+        if normalize_text(zone.get("zone_id"))
+    }
+    disagreements: list[str] = []
+    for index, zone in enumerate(stage2_zones):
+        zone_id = normalize_text(zone.get("zone_id")) or f"zone_{index + 1}"
+        candidate_zone = stage1_by_id.get(zone_id)
+        if candidate_zone is None and index < len(stage1_zones):
+            candidate_zone = stage1_zones[index]
+        candidates = candidate_zone.get("candidates") if isinstance(candidate_zone, dict) else []
+        leading = candidates[0] if isinstance(candidates, list) and candidates else None
+        leading_type = leading.get("roof_type") if isinstance(leading, dict) else leading
+        families = {roof_material_family(leading_type), roof_material_family(zone.get("roof_type"))}
+        if families == {"metal", "membrane"}:
+            disagreements.append(zone_id)
+    return disagreements
+
+
+def metal_membrane_review_zones(stage1: dict, analysis: dict) -> list[str]:
+    """Return family disagreements plus paired low-confidence material zones."""
+    review = metal_membrane_disagreements(stage1, analysis)
+    stage1_zones = [zone for zone in stage1.get("roof_zones") or [] if isinstance(zone, dict)]
+    stage1_by_id = {
+        normalize_text(zone.get("zone_id")): zone
+        for zone in stage1_zones
+        if normalize_text(zone.get("zone_id"))
+    }
+    for index, zone in enumerate(analysis.get("roof_zones") or []):
+        if not isinstance(zone, dict):
+            continue
+        zone_id = normalize_text(zone.get("zone_id")) or f"zone_{index + 1}"
+        if zone_id in review:
+            continue
+        candidate_zone = stage1_by_id.get(zone_id)
+        if candidate_zone is None and index < len(stage1_zones):
+            candidate_zone = stage1_zones[index]
+        candidates = candidate_zone.get("candidates") if isinstance(candidate_zone, dict) else []
+        leading = candidates[0] if isinstance(candidates, list) and candidates else None
+        leading_type = leading.get("roof_type") if isinstance(leading, dict) else leading
+        leading_confidence = int(leading.get("confidence") or 0) if isinstance(leading, dict) else 0
+        stage1_family = roof_material_family(leading_type)
+        stage2_family = roof_material_family(zone.get("roof_type"))
+        stage2_confidence = int(zone.get("confidence") or 0)
+        if (
+            stage1_family == stage2_family
+            and stage1_family in {"metal", "membrane"}
+            and leading_confidence <= 60
+            and stage2_confidence <= 70
+        ):
+            review.append(zone_id)
+    return review
+
+
+def metal_membrane_reference_types(stage1: dict, analysis: dict, config: RoofReferenceConfig) -> list[str]:
+    """Select only approved references relevant to a metal/membrane adjudication."""
+    aliases = {
+        "tpo_pvc_or_coating": ("tpo", "pvc"),
+        "pvc_or_coating": ("pvc",),
+        "epdm_or_mod_bit": ("epdm", "mod_bit"),
+        "mod_bit_or_coating": ("mod_bit",),
+        "mod_bit_coating_or_tar_and_gravel": ("mod_bit",),
+        "mod_bit_or_tar_and_gravel": ("mod_bit",),
+        "coating": ("tpo", "mod_bit"),
+    }
+    observed: list[str] = ["metal"]
+    raw_types: list[str] = []
+    for zone in stage1.get("roof_zones") or []:
+        if not isinstance(zone, dict):
+            continue
+        for candidate in zone.get("candidates") or []:
+            value = candidate.get("roof_type") if isinstance(candidate, dict) else candidate
+            raw_types.append(normalize_text(value).lower())
+    for zone in analysis.get("roof_zones") or []:
+        if isinstance(zone, dict):
+            raw_types.append(normalize_text(zone.get("roof_type")).lower())
+    for key in raw_types:
+        expanded = aliases.get(key, (key,))
+        for candidate in expanded:
+            if candidate in config.roof_types and candidate != "metal" and candidate not in observed:
+                observed.append(candidate)
+    return observed[:3]
+
+
+def metal_membrane_resolution_schema() -> dict:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "resolutions": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 6,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "zone_id": {"type": "string"},
+                        "family": {"type": "string", "enum": ["metal", "membrane", "indeterminate"]},
+                        "roof_type": {
+                            "type": "string",
+                            "enum": ["metal", *sorted(EXPOSED_MEMBRANE_ROOF_TYPES), "unknown"],
+                        },
+                        "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                        "rib_evidence": {
+                            "type": "string",
+                            "enum": ["manufactured_raised", "low_profile_or_surface_marks", "unresolved"],
+                        },
+                        "rigid_geometry": {
+                            "type": "string",
+                            "enum": ["supported", "not_supported", "unresolved"],
+                        },
+                        "membrane_evidence": {
+                            "type": "string",
+                            "enum": ["supported", "not_supported", "unresolved"],
+                        },
+                        "decisive_cues": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                            "maxItems": 4,
+                        },
+                        "limitations": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 0,
+                            "maxItems": 3,
+                        },
+                    },
+                    "required": [
+                        "zone_id",
+                        "family",
+                        "roof_type",
+                        "confidence",
+                        "rib_evidence",
+                        "rigid_geometry",
+                        "membrane_evidence",
+                        "decisive_cues",
+                        "limitations",
+                    ],
+                },
+            }
+        },
+        "required": ["resolutions"],
+    }
+
+
+def metal_membrane_resolution_prompt(
+    row: dict,
+    stage1: dict,
+    analysis: dict,
+    disagreement_zone_ids: list[str],
+) -> str:
+    stage1_material = [
+        {
+            "zone_id": zone.get("zone_id"),
+            "location": zone.get("location"),
+            "visual_evidence": zone.get("visual_evidence"),
+            "candidates": zone.get("candidates"),
+        }
+        for zone in stage1.get("roof_zones") or []
+        if isinstance(zone, dict)
+    ]
+    stage2_material = [
+        {
+            "zone_id": zone.get("zone_id"),
+            "location": zone.get("location"),
+            "roof_type": zone.get("roof_type"),
+            "confidence": zone.get("confidence"),
+            "supporting_cues": zone.get("supporting_cues"),
+            "alternatives": zone.get("alternatives"),
+            "limitations": zone.get("limitations"),
+        }
+        for zone in analysis.get("roof_zones") or []
+        if isinstance(zone, dict)
+    ]
+    metadata = {
+        "address": row.get("Address"),
+        "property_use": row.get("Property Use"),
+        "aerial_source": aerial_source_label(row),
+        "aerial_photo_date": aerial_photo_date_value(row),
+    }
+    return (
+        "Metal-versus-membrane specialist resolver. Decide only the material family for the listed review zones. "
+        "Do not assess condition, damage, ponding, age, risk, repair urgency, or recommendations. Analyze the original-color "
+        "target roof image; do not infer geometry from reference-image similarity, color alone, shadows alone, weathering "
+        "streaks, coating loss, broad sheet seams, attachment rows, or image enhancement artifacts. References are labeled "
+        "comparisons, not templates. Metal requires affirmative manufactured construction evidence. The strongest pathway is "
+        "dense narrow uniformly repeated raised ribs together with a ridge, opposing rigid planes, visible pitch, or metal "
+        "edge construction, with ribs running consistently downslope. A near-vertical image may suppress pitch; in that case "
+        "metal is allowed at confidence no higher than 70 only when a dense full-field rib pattern is roof-relative, terminates "
+        "at roof edges or a transverse crease, is interrupted consistently by rooftop objects, and is absent from masked "
+        "non-roof pixels. Broad low-profile sheet seams, flexible flat-field character, asphaltic roll laps, membrane flashing, "
+        "or irregular marks without rigid panel geometry favor membrane. If rib height, spacing, boundary behavior, or rigid "
+        "geometry cannot be resolved, return indeterminate with roof_type unknown; do not break the tie from color or similarity. "
+        "For a membrane resolution, preserve the narrowest supported canonical membrane type from the supplied candidates; "
+        "use an ambiguity type when chemistry remains unresolved. Return one resolution for every listed zone ID and JSON only.\n\n"
+        f"Review zone IDs: {json.dumps(disagreement_zone_ids)}\n"
+        f"Property metadata: {json.dumps(metadata)}\n"
+        f"Stage 1 material evidence: {json.dumps(stage1_material)}\n"
+        f"Stage 2 material evidence: {json.dumps(stage2_material)}"
+    )
+
+
 def roof_candidate_prompt(row: dict, config: RoofReferenceConfig) -> str:
     guide = config.classification_guide_path.read_text(encoding="utf-8")
     metadata = {
@@ -821,6 +1232,22 @@ def roof_candidate_prompt(row: dict, config: RoofReferenceConfig) -> str:
     )
 
 
+def initial_reference_analysis_prompt(row: dict, config: RoofReferenceConfig) -> str:
+    guide = config.classification_guide_path.read_text(encoding="utf-8")
+    return (
+        analysis_prompt(row)
+        + " This is the initial complete assessment. It must be usable as the final report when material evidence is "
+        "clear, because a reference-comparison call is reserved for uncertain results. For each roof zone, first fill "
+        "visual_evidence using only the target image, then rank one to three candidates, and then select the zone roof_type. "
+        "Keep the selected roof_type, confidence, supporting_cues, alternatives, and limitations consistent with those "
+        "observations and candidates. Use controlled ambiguity types instead of guessing exact chemistry. Assign confidence "
+        f"below {REFERENCE_COMPARISON_MIN_CONFIDENCE} whenever distinguishing seams, ribs, texture, slope, ridge, or edge "
+        "construction are unresolved. Positive reference images are intentionally withheld from this initial call. Return "
+        "the complete report assessment and the required zone-level candidate evidence as JSON only.\n\n"
+        f"Central classification guide:\n{guide}"
+    )
+
+
 def reference_analysis_prompt(
     row: dict,
     stage1: dict,
@@ -831,8 +1258,9 @@ def reference_analysis_prompt(
     central_guide = config.classification_guide_path.read_text(encoding="utf-8")
     return (
         analysis_prompt(row)
-        + " This is Stage 2 of the roof-reference workflow. Reassess the target building image using the candidate "
-        "analysis, selected identification guides, and similarity-ranked positive reference images supplied after this text. "
+        + " This is the single-call reference-assisted roof assessment. Analyze the target and return the complete report, "
+        "including zone-level visual evidence and ranked candidates, using the selected identification guides and "
+        "similarity-ranked positive reference images supplied after this text. No earlier AI assessment exists. "
         "The images are normalized to the same square roof-focused format. "
         "Compare the target against every supplied reference image, not only the first examples. First check whether a "
         "reference depicts the same building and roof geometry as the target. A reviewer-confirmed same-building match "
@@ -840,14 +1268,14 @@ def reference_analysis_prompt(
         "override that evidence with a generic color prior. If the target appears reroofed or materially changed, explain "
         "the visible change instead. Name any same-building or especially strong matching reference filename in the "
         "zone's supporting_cues so the comparison is auditable. "
-        "If Stage 1 contains known_building_match.material_locked=true, the reviewer-confirmed roof type or confirmed "
+        "If the supplied known-building context contains known_building_match.material_locked=true, the reviewer-confirmed roof type or confirmed "
         "zone labels are ground truth for this exact parcel, imagery source, and imagery date. Do not change, broaden, "
         "merge, or omit those labels; use the "
         "image analysis only for condition, physical structure, visible risks, and limitations. "
         "Keep all matching and reference details out of customer-facing observations, summary, and recommendation. "
         "Reference examples are comparisons, not templates: do not classify from color, building shape, or superficial "
         "image similarity alone. A reference-similarity score must never override contradictory target geometry or introduce "
-        "a material unsupported by Stage 1 evidence. Keep visibly distinct roof zones separate, including a small attached section whose "
+        "a material unsupported by target-image evidence. Keep visibly distinct roof zones separate, including a small attached section whose "
         "texture or seam pattern differs from the dominant roof. Do not create multiple material zones from color variation within one continuous roof "
         "field when seams, edges, slope, elevation, and surface construction remain continuous. Treat that variation as "
         "aging, weathering, soiling, repairs, moisture retention, or possible drainage-related condition evidence. Confirm "
@@ -929,7 +1357,7 @@ def reference_analysis_prompt(
         "roof zones. Keep roof_system and roof_structure limited to physical configuration and rooftop features; never "
         "use them as material summaries. If the target image cannot resolve the distinguishing material "
         "cues, cap the affected zone confidence and overall ai_confidence at 60. Return JSON only. "
-        f"Stage 1 candidate analysis: {json.dumps(stage1)}. Selected reference types: {json.dumps(selected)}. "
+        f"Known-building context, when present: {json.dumps(stage1)}. Locally selected reference types: {json.dumps(selected)}. "
         f"Central classification guide:\n{central_guide}"
     )
 
@@ -937,6 +1365,18 @@ def reference_analysis_prompt(
 def build_openai_candidate_content(row: dict, target_path: Path, config: RoofReferenceConfig) -> list[dict]:
     return [
         {"type": "input_text", "text": roof_candidate_prompt(row, config)},
+        {"type": "input_text", "text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
+        {"type": "input_image", "image_url": encode_image_data_url(target_path), "detail": "high"},
+    ]
+
+
+def build_openai_initial_reference_content(
+    row: dict,
+    target_path: Path,
+    config: RoofReferenceConfig,
+) -> list[dict]:
+    return [
+        {"type": "input_text", "text": initial_reference_analysis_prompt(row, config)},
         {"type": "input_text", "text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
         {"type": "input_image", "image_url": encode_image_data_url(target_path), "detail": "high"},
     ]
@@ -1008,6 +1448,21 @@ def build_gemini_candidate_parts(row: dict, target_path: Path, config: RoofRefer
     ]
 
 
+def build_gemini_initial_reference_parts(
+    row: dict,
+    target_path: Path,
+    config: RoofReferenceConfig,
+) -> list[dict]:
+    schema_instruction = "\nRequired JSON schema:\n" + json.dumps(
+        initial_reference_analysis_schema(config)
+    )
+    return [
+        {"text": initial_reference_analysis_prompt(row, config) + schema_instruction},
+        {"text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
+        gemini_inline_image(target_path),
+    ]
+
+
 def build_gemini_reference_parts(
     row: dict,
     target_path: Path,
@@ -1015,7 +1470,7 @@ def build_gemini_reference_parts(
     bundle: list[LoadedRoofReference],
     config: RoofReferenceConfig,
 ) -> list[dict]:
-    schema_instruction = "\nRequired JSON schema:\n" + json.dumps(reference_analysis_schema())
+    schema_instruction = "\nRequired JSON schema:\n" + json.dumps(initial_reference_analysis_schema(config))
     parts: list[dict] = [
         {"text": reference_analysis_prompt(row, stage1, bundle, config) + schema_instruction},
         {"text": f"TARGET BUILDING IMAGE — {aerial_source_label(row)}:"},
@@ -1050,6 +1505,82 @@ def build_gemini_reference_parts(
                 }
             )
             parts.append(gemini_inline_image(image_path))
+    return parts
+
+
+def build_openai_metal_membrane_content(
+    row: dict,
+    target_path: Path,
+    stage1: dict,
+    analysis: dict,
+    disagreement_zone_ids: list[str],
+    bundle: list[LoadedRoofReference],
+) -> list[dict]:
+    content: list[dict] = [
+        {
+            "type": "input_text",
+            "text": metal_membrane_resolution_prompt(
+                row, stage1, analysis, disagreement_zone_ids
+            ),
+        },
+        {"type": "input_text", "text": "ORIGINAL-COLOR TARGET ROOF IMAGE:"},
+        {"type": "input_image", "image_url": encode_image_data_url(target_path), "detail": "high"},
+    ]
+    for item in bundle:
+        for index, image_path in enumerate(item.image_paths):
+            source_path = item.source_image_paths[index]
+            content.extend(
+                [
+                    {
+                        "type": "input_text",
+                        "text": (
+                            f"REVIEWER-CONFIRMED {item.label} COMPARISON — "
+                            f"{relative_project_path(source_path)}:"
+                        ),
+                    },
+                    {
+                        "type": "input_image",
+                        "image_url": encode_image_data_url(image_path),
+                        "detail": "high",
+                    },
+                ]
+            )
+    return content
+
+
+def build_gemini_metal_membrane_parts(
+    row: dict,
+    target_path: Path,
+    stage1: dict,
+    analysis: dict,
+    disagreement_zone_ids: list[str],
+    bundle: list[LoadedRoofReference],
+) -> list[dict]:
+    parts: list[dict] = [
+        {
+            "text": metal_membrane_resolution_prompt(
+                row, stage1, analysis, disagreement_zone_ids
+            )
+            + "\nRequired JSON schema:\n"
+            + json.dumps(metal_membrane_resolution_schema())
+        },
+        {"text": "ORIGINAL-COLOR TARGET ROOF IMAGE:"},
+        gemini_inline_image(target_path),
+    ]
+    for item in bundle:
+        for index, image_path in enumerate(item.image_paths):
+            source_path = item.source_image_paths[index]
+            parts.extend(
+                [
+                    {
+                        "text": (
+                            f"REVIEWER-CONFIRMED {item.label} COMPARISON — "
+                            f"{relative_project_path(source_path)}:"
+                        )
+                    },
+                    gemini_inline_image(image_path),
+                ]
+            )
     return parts
 
 
@@ -1103,7 +1634,12 @@ def openai_usage_summary(response: dict) -> dict:
     return summary
 
 
-def combined_ai_usage(stage1: dict, stage2: dict) -> dict:
+def combined_ai_usage(
+    stage1: dict,
+    stage2: dict | None = None,
+    resolver: dict | None = None,
+) -> dict:
+    stages = [stage1] + ([stage2] if stage2 is not None else []) + ([resolver] if resolver is not None else [])
     combined: dict[str, object] = {}
     for key in (
         "input_tokens",
@@ -1112,13 +1648,24 @@ def combined_ai_usage(stage1: dict, stage2: dict) -> dict:
         "reasoning_output_tokens",
         "total_tokens",
     ):
-        combined[key] = int(stage1.get(key) or 0) + int(stage2.get(key) or 0)
-    if "estimated_cost_usd" in stage1 or "estimated_cost_usd" in stage2:
+        combined[key] = sum(int(stage.get(key) or 0) for stage in stages)
+    if any("estimated_cost_usd" in stage for stage in stages):
         combined["estimated_cost_usd"] = round(
-            float(stage1.get("estimated_cost_usd") or 0) + float(stage2.get("estimated_cost_usd") or 0),
+            sum(float(stage.get("estimated_cost_usd") or 0) for stage in stages),
             6,
         )
-    combined["by_stage"] = {"candidate_classification": stage1, "reference_comparison": stage2}
+    combined["by_stage"] = {"initial_assessment": stage1}
+    if stage2 is not None:
+        combined["by_stage"]["reference_comparison"] = stage2
+    if resolver is not None:
+        combined["by_stage"]["metal_membrane_resolver"] = resolver
+    return combined
+
+
+def single_call_ai_usage(summary: dict) -> dict:
+    """Record one reference-assisted provider call without implying a second stage."""
+    combined = copy.deepcopy(summary)
+    combined["by_stage"] = {"reference_assisted_analysis": copy.deepcopy(summary)}
     return combined
 
 
@@ -1242,6 +1789,108 @@ def validate_reference_analysis(analysis: dict) -> None:
         raise RuntimeError("Roof-reference Stage 2 returned no roof_zones")
 
 
+def validate_initial_reference_analysis(analysis: dict) -> None:
+    validate_reference_analysis(analysis)
+    validate_candidate_analysis(candidate_analysis_from_initial(analysis))
+
+
+def validate_metal_membrane_resolution(
+    resolution: dict,
+    disagreement_zone_ids: list[str],
+) -> None:
+    if not isinstance(resolution, dict) or not isinstance(resolution.get("resolutions"), list):
+        raise RuntimeError("Metal/membrane resolver returned no resolutions")
+    expected = set(disagreement_zone_ids)
+    returned: set[str] = set()
+    for item in resolution["resolutions"]:
+        if not isinstance(item, dict):
+            raise RuntimeError("Metal/membrane resolver returned an invalid resolution")
+        zone_id = normalize_text(item.get("zone_id"))
+        family = normalize_text(item.get("family")).lower()
+        roof_type = normalize_text(item.get("roof_type")).lower()
+        if zone_id not in expected or zone_id in returned:
+            raise RuntimeError(f"Metal/membrane resolver returned unexpected zone {zone_id!r}")
+        if family == "metal" and roof_type != "metal":
+            raise RuntimeError(f"Metal/membrane resolver zone {zone_id} has inconsistent metal output")
+        if family == "membrane" and roof_type not in EXPOSED_MEMBRANE_ROOF_TYPES:
+            raise RuntimeError(f"Metal/membrane resolver zone {zone_id} has invalid membrane output")
+        if family == "indeterminate" and roof_type != "unknown":
+            raise RuntimeError(f"Metal/membrane resolver zone {zone_id} must use unknown when indeterminate")
+        returned.add(zone_id)
+    missing = sorted(expected - returned)
+    if missing:
+        raise RuntimeError("Metal/membrane resolver omitted zones: " + ", ".join(missing))
+
+
+def apply_metal_membrane_resolution(
+    analysis: dict,
+    resolution: dict,
+    disagreement_zone_ids: list[str],
+) -> dict:
+    """Apply only confident family decisions; leave indeterminate results unchanged."""
+    decisions = {
+        normalize_text(item.get("zone_id")): item
+        for item in resolution.get("resolutions") or []
+        if isinstance(item, dict)
+    }
+    allowed = set(disagreement_zone_ids)
+    applied: list[dict] = []
+    for index, zone in enumerate(analysis.get("roof_zones") or []):
+        if not isinstance(zone, dict):
+            continue
+        zone_id = normalize_text(zone.get("zone_id")) or f"zone_{index + 1}"
+        decision = decisions.get(zone_id)
+        if zone_id not in allowed or not decision:
+            continue
+        family = normalize_text(decision.get("family")).lower()
+        confidence = int(decision.get("confidence") or 0)
+        if family == "indeterminate" or confidence < METAL_MEMBRANE_RESOLVER_MIN_CONFIDENCE:
+            continue
+        previous_type = normalize_text(zone.get("roof_type")).lower()
+        resolved_type = normalize_text(decision.get("roof_type")).lower()
+        if roof_material_family(previous_type) == family:
+            resolved_type = previous_type
+        if resolved_type == previous_type:
+            applied.append(
+                {
+                    "zone_id": zone_id,
+                    "previous_roof_type": previous_type,
+                    "resolved_roof_type": resolved_type,
+                    "changed": False,
+                    "confidence": confidence,
+                }
+            )
+            continue
+        zone["roof_type"] = resolved_type
+        zone["confidence"] = confidence
+        zone["supporting_cues"] = list(decision.get("decisive_cues") or [])
+        zone["limitations"] = list(decision.get("limitations") or [])
+        zone["alternatives"] = [previous_type] if previous_type else []
+        applied.append(
+            {
+                "zone_id": zone_id,
+                "previous_roof_type": previous_type,
+                "resolved_roof_type": resolved_type,
+                "changed": True,
+                "confidence": confidence,
+            }
+        )
+    if applied:
+        changed_confidences = [item["confidence"] for item in applied if item["changed"]]
+        if changed_confidences:
+            existing = int(analysis.get("ai_confidence") or 100)
+            analysis["ai_confidence"] = min(existing, min(changed_confidences))
+        normalize_reference_analysis(analysis)
+    return {
+        "version": METAL_MEMBRANE_RESOLVER_VERSION,
+        "status": "applied" if any(item["changed"] for item in applied) else "no_change",
+        "minimum_confidence": METAL_MEMBRANE_RESOLVER_MIN_CONFIDENCE,
+        "review_zone_ids": disagreement_zone_ids,
+        "decisions": resolution.get("resolutions") or [],
+        "applications": applied,
+    }
+
+
 def normalize_reference_analysis(analysis: dict) -> None:
     """Derive all displayed material facts from the canonical zone evidence."""
     normalize_zone_materials(analysis)
@@ -1281,18 +1930,11 @@ def call_openai_reference_analysis(row: dict, target_path: Path, model: str) -> 
     config = load_roof_reference_config()
     known_match = find_known_building_match(row, config)
     if known_match:
-        stage1 = known_building_stage1(known_match)
-        stage1_response = {}
+        context = known_building_stage1(known_match)
+        selected = select_reference_types(context, config)
     else:
-        stage1, stage1_response = call_openai_structured(
-            build_openai_candidate_content(row, target_path, config),
-            model,
-            roof_candidate_schema(config),
-            "roof_candidate_classification",
-            1400,
-        )
-        validate_candidate_analysis(stage1)
-    selected = select_reference_types(stage1, config)
+        context = {}
+        selected = select_single_call_reference_types(config, target_path)
     normalized_target, bundle = retrieve_reference_bundle(
         selected,
         config,
@@ -1301,30 +1943,46 @@ def call_openai_reference_analysis(row: dict, target_path: Path, model: str) -> 
         max_images=maximum_retrieved_reference_images(),
         images_per_type=reference_images_per_type(),
     )
-    analysis, stage2_response = call_openai_structured(
-        build_openai_reference_content(row, normalized_target, stage1, bundle, config),
+    initial, response = call_openai_structured(
+        build_openai_reference_content(row, normalized_target, context, bundle, config),
         model,
-        reference_analysis_schema(),
-        "roof_reference_analysis",
-        2800,
+        initial_reference_analysis_schema(config),
+        "roof_reference_assisted_analysis",
+        3000,
     )
-    validate_reference_analysis(analysis)
+    validate_initial_reference_analysis(initial)
+    candidate_analysis = candidate_analysis_from_initial(initial)
     if known_match:
-        lock_known_building_material(analysis, known_match)
+        lock_known_building_material(initial, known_match)
+    normalize_reference_analysis(initial)
+    review = material_review_recommendation(initial, reviewer_confirmed=bool(known_match))
+    analysis = strip_initial_material_evidence(initial)
     normalize_reference_analysis(analysis)
-    stage1_usage = openai_usage_summary(stage1_response)
-    stage2_usage = openai_usage_summary(stage2_response)
+    analysis["material_review"] = review
+    analysis["roof_description"] = uncertainty_aware_roof_description(analysis)
     analysis["source"] = "openai"
-    analysis["usage"] = combined_ai_usage(stage1_usage, stage2_usage)
+    analysis["usage"] = single_call_ai_usage(openai_usage_summary(response))
     analysis["reference_workflow"] = roof_reference_trace(
         config,
         bundle,
-        stage1,
+        candidate_analysis,
         "openai",
         model,
+        status="completed_single_call",
         known_building_match=known_match.as_trace() if known_match else None,
         normalized_target_path=normalized_target,
     )
+    analysis["reference_workflow"]["reference_comparison"] = {
+        "triggered": False,
+        "status": "retired_single_call_workflow",
+        "minimum_confidence": REFERENCE_COMPARISON_MIN_CONFIDENCE,
+        "reasons": [],
+    }
+    analysis["reference_workflow"]["material_review"] = copy.deepcopy(review)
+    analysis["reference_workflow"]["metal_membrane_resolver"] = {
+        "version": METAL_MEMBRANE_RESOLVER_VERSION,
+        "status": "retired_single_call_workflow",
+    }
     return analysis
 
 
@@ -1521,16 +2179,11 @@ def call_gemini_reference_analysis(row: dict, target_path: Path, model: str) -> 
     config = load_roof_reference_config()
     known_match = find_known_building_match(row, config)
     if known_match:
-        stage1 = known_building_stage1(known_match)
-        stage1_response = {}
+        context = known_building_stage1(known_match)
+        selected = select_reference_types(context, config)
     else:
-        stage1, stage1_response = call_gemini_structured(
-            build_gemini_candidate_parts(row, target_path, config),
-            model,
-            1400,
-        )
-        validate_candidate_analysis(stage1)
-    selected = select_reference_types(stage1, config)
+        context = {}
+        selected = select_single_call_reference_types(config, target_path)
     normalized_target, bundle = retrieve_reference_bundle(
         selected,
         config,
@@ -1539,28 +2192,44 @@ def call_gemini_reference_analysis(row: dict, target_path: Path, model: str) -> 
         max_images=maximum_retrieved_reference_images(),
         images_per_type=reference_images_per_type(),
     )
-    analysis, stage2_response = call_gemini_structured(
-        build_gemini_reference_parts(row, normalized_target, stage1, bundle, config),
+    initial, response = call_gemini_structured(
+        build_gemini_reference_parts(row, normalized_target, context, bundle, config),
         model,
-        2800,
+        3000,
     )
-    validate_reference_analysis(analysis)
+    validate_initial_reference_analysis(initial)
+    candidate_analysis = candidate_analysis_from_initial(initial)
     if known_match:
-        lock_known_building_material(analysis, known_match)
+        lock_known_building_material(initial, known_match)
+    normalize_reference_analysis(initial)
+    review = material_review_recommendation(initial, reviewer_confirmed=bool(known_match))
+    analysis = strip_initial_material_evidence(initial)
     normalize_reference_analysis(analysis)
-    stage1_usage = gemini_usage_summary(stage1_response)
-    stage2_usage = gemini_usage_summary(stage2_response)
+    analysis["material_review"] = review
+    analysis["roof_description"] = uncertainty_aware_roof_description(analysis)
     analysis["source"] = "gemini"
-    analysis["usage"] = combined_ai_usage(stage1_usage, stage2_usage)
+    analysis["usage"] = single_call_ai_usage(gemini_usage_summary(response))
     analysis["reference_workflow"] = roof_reference_trace(
         config,
         bundle,
-        stage1,
+        candidate_analysis,
         "gemini",
         model,
+        status="completed_single_call",
         known_building_match=known_match.as_trace() if known_match else None,
         normalized_target_path=normalized_target,
     )
+    analysis["reference_workflow"]["reference_comparison"] = {
+        "triggered": False,
+        "status": "retired_single_call_workflow",
+        "minimum_confidence": REFERENCE_COMPARISON_MIN_CONFIDENCE,
+        "reasons": [],
+    }
+    analysis["reference_workflow"]["material_review"] = copy.deepcopy(review)
+    analysis["reference_workflow"]["metal_membrane_resolver"] = {
+        "version": METAL_MEMBRANE_RESOLVER_VERSION,
+        "status": "retired_single_call_workflow",
+    }
     return analysis
 
 
@@ -1628,6 +2297,8 @@ def load_or_create_analysis(
     analysis["roof_type"] = roof_type_card_text(analysis)
     analysis["roof_system"] = roof_structure_card_text(analysis)
     analysis = apply_visual_risk_adjustment(analysis, row)
+    if analysis.get("material_review"):
+        analysis["roof_description"] = uncertainty_aware_roof_description(analysis)
     analysis["target_scope"] = {
         "policy": "selected canonical building footprint only",
         "mask_version": normalize_text(row.get("Primary Aerial Target Mask Version")),
@@ -2394,8 +3065,17 @@ def render_report(row: dict, analysis: dict, denver_path: Path | None, drcog_pat
     draw_key_values_wrapped(
         draw,
         [
-            ("Roof Type", roof_type_card_text(analysis)),
-            ("Roof System", roof_structure_card_text(analysis)),
+            (
+                "Roof Description",
+                normalize_text(analysis.get("roof_description"))
+                or f"{roof_type_card_text(analysis)}; {roof_structure_card_text(analysis)}",
+            ),
+            (
+                "Material Review",
+                "Reviewer or onsite confirmation recommended"
+                if (analysis.get("material_review") or {}).get("recommended")
+                else "Not indicated",
+            ),
             ("Visible Concerns", visible_concerns_text(analysis)),
             ("Roof Age Est.", normalize_text(analysis.get("roof_age_estimate"))),
             ("Roof Area", f"{format_int(row.get('Building Footprint Sq Ft'))} SF"),

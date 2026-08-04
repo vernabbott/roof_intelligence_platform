@@ -47,7 +47,7 @@ For a confirmed positive identification example:
    exact known-building match locks every reviewed zone instead of collapsing
    the property to the reference image's primary library type.
 5. Increment `workflow_version` in the manifest.
-6. Do not create or restore a `stage2_images` list. Runtime Stage 2
+6. Do not create or restore a `stage2_images` list. The single-call runtime
    uses deterministic top-reference retrieval from all approved
    `reference_images` entries.
 7. If the user also confirmed a condition or damage category, add the same

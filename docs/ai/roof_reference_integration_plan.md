@@ -7,6 +7,12 @@ status: implemented
 ## Implementation Status
 
 Implemented behind an opt-in feature flag. The legacy one-call AI workflow remains the default when the flag is off.
+When enabled, the roof-reference workflow uses one reference-assisted provider
+call per roof. Reference families and images are selected locally before the
+request. The provider returns zone evidence, ranked material candidates,
+confidence, limitations, and the complete report in the same response. An
+uncertain result uses controlled ambiguity wording and is marked for human or
+onsite confirmation; it does not trigger another provider call.
 
 Enable it for the PCS report worker through `.env` or the process environment:
 
@@ -17,16 +23,23 @@ ROOF_REFERENCE_CLASSIFICATION=1
 Every image listed under a selected roof type's `reference_images` is eligible
 for deterministic retrieval. Images are normalized to a common square canvas,
 ranked against the target, and a balanced top-reference bundle is supplied to
-Stage 2. The default limits are eight total images and two per roof type.
+the single analysis call. The default limits are eight total images and two per roof type.
 `ROOF_REFERENCE_MAX_RETRIEVED_IMAGES` and
 `ROOF_REFERENCE_IMAGES_PER_TYPE` can override those limits. The report trace
 records approved sources, normalized inputs, similarity scores, and used
 counts.
 
-Before Stage 1, the workflow also checks reviewer-confirmed known-building
-metadata. An exact parcel number + imagery source + imagery date match bypasses
-material inference, locks the canonical roof material, and still uses Stage 2
-to assess condition and other visible characteristics.
+The former second-call metal-versus-membrane resolver is retired in the
+single-call workflow. Metal and modified-bitumen references are reserved in the
+locally selected comparison set, allowing the primary request to evaluate the
+known confusion pair without another billable call. Setting
+`ROOF_METAL_MEMBRANE_RESOLVER=1` no longer creates an additional request; the
+trace records that the resolver was retired by the single-call workflow.
+
+Before reference selection, the workflow checks reviewer-confirmed
+known-building metadata. An exact parcel number + imagery source + imagery date
+match locks the canonical roof material while the same single call assesses
+condition and other visible characteristics.
 
 When enabled, a roof-reference failure automatically retries the legacy provider call. Static fallback output is used only when provider analysis also fails and `--allow-ai-fallback` is enabled.
 
@@ -43,30 +56,28 @@ Use a hybrid structure:
 
 Markdown links do not automatically provide local documents or images to an AI API. The report generator must explicitly read each selected guide and encode each selected reference image in the model request.
 
-### Stage 1: Candidate Classification
+### Local Reference Selection
 
-Provide the model with:
+Without making a provider call:
 
-- The target building aerial image
-- The central `roof_type_classification.md` guidance
-- A concise cross-material comparison or condensed guidance for all supported roof types
+- Normalize the target image.
+- Rank approved reference images against the target.
+- Select the most similar distinct roof families.
+- Reserve metal and modified-bitumen examples for the known confusion pair.
+- Prefer an exact reviewer-confirmed building match when parcel, source, and image date agree.
 
-Require the model to:
+### Single Reference-Assisted Analysis
+
+Provide the model with the target image, central guide, selected identification
+guides, and selected reviewer-confirmed reference images. Require one response
+that:
 
 - Segment buildings containing multiple roof zones
 - Return the most likely roof-system candidates for each zone
 - Preserve ambiguous classifications instead of forcing one material
-- Identify the roof-specific guides needed for final comparison
-
-### Stage 2: Reference Comparison
-
-For the leading candidates from Stage 1, provide the model with:
-
-- The normalized target-building crop
-- The complete identification guide for each selected roof type
-- A balanced, similarity-ranked subset of normalized positive references
-
-Require the model to return the final zone-level classification, confidence, supporting cues, remaining alternatives, and image limitations.
+- Return the complete condition assessment and report content
+- Cap confidence when distinguishing construction details are unresolved
+- Avoid a follow-up model request; low-confidence output is routed to human or onsite confirmation
 
 ## Reference Manifest
 
@@ -113,8 +124,8 @@ Store the following with each generated analysis:
 - Reference-image filenames supplied
 - Manifest version or hash
 - Guide and image hashes or modification timestamps
-- Candidate types returned by Stage 1
-- Final zone classifications and confidence returned by Stage 2
+- Candidate types and visual evidence returned by the single analysis call
+- Final zone classifications, confidence, review recommendation, and uncertainty reasons
 
 This makes it possible to reproduce results and determine which reference-library version influenced a report.
 

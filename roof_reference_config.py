@@ -16,6 +16,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_ROOF_REFERENCE_MANIFEST_PATH = PROJECT_ROOT / "docs/ai/roof_reference_manifest.yaml"
 ROOF_REFERENCE_FEATURE_ENV = "ROOF_REFERENCE_CLASSIFICATION"
+METAL_MEMBRANE_RESOLVER_ENV = "ROOF_METAL_MEMBRANE_RESOLVER"
 CONFIRMED_ZONE_ROOF_TYPES = {
     "tpo",
     "tpo_pvc_or_coating",
@@ -455,6 +456,11 @@ def env_flag(name: str, default: bool = False) -> bool:
 
 def roof_reference_feature_enabled(explicit_flag: bool = False) -> bool:
     return bool(explicit_flag or env_flag(ROOF_REFERENCE_FEATURE_ENV))
+
+
+def metal_membrane_resolver_enabled() -> bool:
+    """Return whether the disagreement-only material resolver is enabled."""
+    return env_flag(METAL_MEMBRANE_RESOLVER_ENV)
 
 
 def normalize_roof_type_key(value: object, config: RoofReferenceConfig) -> str:
