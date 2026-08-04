@@ -132,7 +132,7 @@ trapped moisture, remaining service life, or the exact modified-bitumen assembly
 
 #### Aging Example 3 — Heavily Weathered Modified Bitumen or Coated Roof
 
-![Heavily weathered modified bitumen or coated roof with no distinct ponding](../../../../aerial_images_single_address/arapahoe_aerials/197133208014-arapahoe_aerials-ai-target.png)
+![Heavily weathered modified bitumen or coated roof with no distinct ponding](../known_buildings/197133208014-arapahoe_aerials-ai-target.png)
 
 This reviewer-confirmed condition example shows one continuous light roof field
 with heavy irregular streaking, chalking, surface wear, and widespread
@@ -160,7 +160,7 @@ testing.
 
 #### Aging Example 5 — Poor Tan Roof with Three-Way Material Ambiguity
 
-![Poor tan low-slope roof with white penetration repairs](../../../../aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png)
+![Poor tan low-slope roof with white penetration repairs](../known_buildings/197133206005-arapahoe_aerials-ai-target.png)
 
 This reviewer-confirmed condition example has one continuous tan, matte,
 weathered low-slope field whose aerial details do not separate modified

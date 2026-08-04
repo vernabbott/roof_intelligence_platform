@@ -556,7 +556,7 @@ class RoofReferenceRequestTests(unittest.TestCase):
 
     def test_normalized_crop_and_top_reference_retrieval(self) -> None:
         target = Path(
-            "aerial_images_single_address/world_imagery/"
+            "tests/fixtures/roof_reference/"
             "0533100022000-world_imagery-ai-target.png"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -577,7 +577,7 @@ class RoofReferenceRequestTests(unittest.TestCase):
 
     def test_retrieval_bundle_is_balanced_and_bounded(self) -> None:
         target = Path(
-            "aerial_images_single_address/world_imagery/"
+            "tests/fixtures/roof_reference/"
             "0533100022000-world_imagery-ai-target.png"
         )
         row = {
@@ -1216,7 +1216,7 @@ class RoofReferenceRequestTests(unittest.TestCase):
             "Primary Aerial Photo Date": "2025-09-06",
         }
         target = Path(
-            "aerial_images_single_address/world_imagery/"
+            "tests/fixtures/roof_reference/"
             "0533100022000-world_imagery-ai-target.png"
         )
         stage2_response = {

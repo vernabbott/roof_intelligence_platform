@@ -1,7 +1,7 @@
 schema_version: 2
 cases:
   - id: tejon_white_single_ply_or_coating_misread_as_metal
-    target_image: aerial_images_single_address/arapahoe_aerials/197133206006-arapahoe_aerials-ai-target.png
+    target_image: docs/ai/roof_reference_library/known_buildings/197133206006-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133206006"
       Primary Aerial Source: Arapahoe County Aerials
@@ -10,7 +10,7 @@ cases:
     expected_zone_types: [tpo_pvc_or_coating]
     expected_known_match: true
   - id: dartmouth_modified_bitumen
-    target_image: aerial_images_single_address/world_imagery/0533100022000-world_imagery-ai-target.png
+    target_image: tests/fixtures/roof_reference/0533100022000-world_imagery-ai-target.png
     property:
       Parcel Number: "0533100022000"
       Primary Aerial Source: Esri World Imagery
@@ -28,7 +28,7 @@ cases:
     expected_known_match: true
     expected_top_reference: docs/ai/roof_reference_library/metal/images/metal_008.png
   - id: arapahoe_mixed_epdm_and_dark_membrane
-    target_image: aerial_images_single_address/arapahoe_aerials/197128342001-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197128342001-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197128342001"
       Primary Aerial Source: Arapahoe County Aerials
@@ -38,7 +38,7 @@ cases:
     expected_known_match: true
     expected_top_reference: docs/ai/roof_reference_library/epdm/images/epdm_005.png
   - id: arapahoe_heavily_weathered_mod_bit_or_coating
-    target_image: aerial_images_single_address/arapahoe_aerials/197133208014-arapahoe_aerials-ai-target.png
+    target_image: docs/ai/roof_reference_library/known_buildings/197133208014-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133208014"
       Primary Aerial Source: Arapahoe County Aerials
@@ -48,7 +48,7 @@ cases:
     expected_known_match: true
     expected_condition_tags: [heavy_aging, weathering, suspected_localized_failure, leak_potential, no_distinct_ponding]
   - id: arapahoe_light_monolithic_mod_bit_or_coating
-    target_image: aerial_images_single_address/arapahoe_aerials/197133204008-arapahoe_aerials-ai-target.png
+    target_image: docs/ai/roof_reference_library/known_buildings/197133204008-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133204008"
       Primary Aerial Source: Arapahoe County Aerials
@@ -57,7 +57,7 @@ cases:
     expected_zone_types: [mod_bit_or_coating]
     expected_known_match: true
   - id: arapahoe_tan_patched_mod_bit_coating_or_tar_and_gravel
-    target_image: aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png
+    target_image: docs/ai/roof_reference_library/known_buildings/197133206005-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133206005"
       Primary Aerial Source: Arapahoe County Aerials
@@ -67,7 +67,7 @@ cases:
     expected_known_match: true
     expected_condition_tags: [heavy_aging, weathering, penetration_patching, prior_repairs, suspected_localized_failure, leak_potential, poor_condition]
   - id: college_weathered_patched_ponding_modified_bitumen
-    target_image: aerial_images_single_address/arapahoe_aerials/197128306037-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197128306037-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197128306037"
       Primary Aerial Source: Arapahoe County Aerials
@@ -78,7 +78,7 @@ cases:
     expected_top_reference: docs/ai/roof_reference_library/mod_bit/images/mod_bit_005.png
     expected_condition_tags: [heavy_aging, weathering, patching, ponding_evidence, probable_end_of_service_life, leak_potential]
   - id: yale_bright_ribbed_metal_with_penetration_repairs
-    target_image: aerial_images_single_address/arapahoe_aerials/197133204009-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197133204009-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133204009"
       Primary Aerial Source: Arapahoe County Aerials
@@ -89,7 +89,7 @@ cases:
     expected_top_reference: docs/ai/roof_reference_library/metal/images/metal_009.png
     expected_condition_tags: [penetration_patching, prior_repairs, leak_potential, silicone_restoration_candidate]
   - id: tejon_metal_with_fiberglass_skylight_panels
-    target_image: aerial_images_single_address/arapahoe_aerials/197128300071-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197128300071-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197128300071"
       Primary Aerial Source: Arapahoe County Aerials
@@ -100,7 +100,7 @@ cases:
     expected_top_reference: docs/ai/roof_reference_library/metal/images/metal_010.png
     expected_condition_tags: [skylights_present, fiberglass_skylight_panels, silicone_coating_exclusion]
   - id: vallejo_ridged_metal_with_panel_section_replacements
-    target_image: aerial_images_single_address/arapahoe_aerials/197133206001-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197133206001-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133206001"
       Primary Aerial Source: Arapahoe County Aerials
@@ -111,7 +111,7 @@ cases:
     expected_top_reference: docs/ai/roof_reference_library/metal/images/metal_011.png
     expected_condition_tags: [panel_section_replacements, prior_repairs, no_distinct_ponding]
   - id: arapahoe_two_tone_pitched_metal_with_skylights
-    target_image: aerial_images_single_address/arapahoe_aerials/197128311005-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197128311005-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197128311005"
       Primary Aerial Source: Arapahoe County Aerials
@@ -122,7 +122,7 @@ cases:
     expected_top_reference: docs/ai/roof_reference_library/metal/images/metal_012.png
     expected_condition_tags: [skylights_present, fiberglass_skylight_panels, silicone_coating_exclusion]
   - id: tejon_bright_white_ridged_metal_misread_as_single_ply
-    target_image: aerial_images_single_address/arapahoe_aerials/197133204015-arapahoe_aerials-ai-target.png
+    target_image: tests/fixtures/roof_reference/197133204015-arapahoe_aerials-ai-target.png
     property:
       Parcel Number: "197133204015"
       Primary Aerial Source: Arapahoe County Aerials

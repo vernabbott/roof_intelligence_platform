@@ -1,5 +1,5 @@
 schema_version: 2
-workflow_version: "2.16"
+workflow_version: "2.17"
 classification_guide: docs/ai/roof_type_classification.md
 maximum_candidate_types: 5
 
@@ -13,7 +13,7 @@ confusion_groups:
 # without teaching an ambiguous roof as a generic example of one material.
 known_building_corrections:
   - roof_type: tpo_pvc_or_coating
-    path: aerial_images_single_address/arapahoe_aerials/197133206006-arapahoe_aerials-ai-target.png
+    path: docs/ai/roof_reference_library/known_buildings/197133206006-arapahoe_aerials-ai-target.png
     reviewer_confirmed: true
     crop_box: [0.1126, 0.3848, 0.8874, 0.6146]
     known_buildings:
@@ -40,7 +40,7 @@ known_building_corrections:
           - Aerial resolution cannot reliably distinguish TPO from PVC or a reflective coating.
           - Exact membrane chemistry, substrate, attachment method, and coating history require onsite inspection or records.
   - roof_type: mod_bit_or_coating
-    path: aerial_images_single_address/arapahoe_aerials/197133208014-arapahoe_aerials-ai-target.png
+    path: docs/ai/roof_reference_library/known_buildings/197133208014-arapahoe_aerials-ai-target.png
     reviewer_confirmed: true
     crop_box: [0.2559, 0.1901, 0.7441, 0.8105]
     known_buildings:
@@ -67,7 +67,7 @@ known_building_corrections:
           - Aerial imagery does not resolve roll laps or coating application details well enough to separate modified bitumen from a coated roof.
           - Active leakage, leak locations, wet insulation, and remaining service life require onsite inspection and moisture testing.
   - roof_type: mod_bit_or_coating
-    path: aerial_images_single_address/arapahoe_aerials/197133204008-arapahoe_aerials-ai-target.png
+    path: docs/ai/roof_reference_library/known_buildings/197133204008-arapahoe_aerials-ai-target.png
     reviewer_confirmed: true
     crop_box: [0.1048, 0.3197, 0.8952, 0.6803]
     known_buildings:
@@ -93,7 +93,7 @@ known_building_corrections:
           - Seam absence is used only because the image provides adequate continuous roof-field visibility; soft or obstructed imagery must record seams as unresolved instead.
           - Aerial imagery cannot establish the underlying assembly beneath a coating or reliably separate smooth modified bitumen from a coated roof.
   - roof_type: mod_bit_coating_or_tar_and_gravel
-    path: aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png
+    path: docs/ai/roof_reference_library/known_buildings/197133206005-arapahoe_aerials-ai-target.png
     reviewer_confirmed: true
     crop_box: [0.1204, 0.3789, 0.8796, 0.6211]
     known_buildings:

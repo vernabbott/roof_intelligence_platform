@@ -110,7 +110,7 @@ Extensive membrane or ply failure, active water intrusion, widespread saturated 
 
 #### Aging Example 1 — Poor Tan Roof with Three-Way Material Ambiguity
 
-![Poor tan low-slope roof with white penetration repairs](../../../../aerial_images_single_address/arapahoe_aerials/197133206005-arapahoe_aerials-ai-target.png)
+![Poor tan low-slope roof with white penetration repairs](../known_buildings/197133206005-arapahoe_aerials-ai-target.png)
 
 This reviewer-confirmed condition example retains **Modified Bitumen, Coated
 Roof, or Tar and Gravel** because the tan field does not resolve embedded
