@@ -32,7 +32,7 @@ create table public.roof_intelligence_processing_feedback (
   before_values jsonb not null check (jsonb_typeof(before_values) = 'object'),
   corrected_values jsonb not null check (
     jsonb_typeof(corrected_values) = 'object'
-    and jsonb_object_length(corrected_values) > 0
+    and corrected_values <> '{}'::jsonb
   ),
   learning_scopes text[] not null check (cardinality(learning_scopes) > 0),
   property_identity jsonb not null check (jsonb_typeof(property_identity) = 'object'),

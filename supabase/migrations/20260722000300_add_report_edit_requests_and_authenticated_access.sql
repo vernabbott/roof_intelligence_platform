@@ -27,7 +27,7 @@ create table public.roof_intelligence_report_edit_requests (
   requested_by uuid not null references auth.users(id) on delete restrict,
   edit_patch jsonb not null check (
     jsonb_typeof(edit_patch) = 'object'
-    and jsonb_object_length(edit_patch) > 0
+    and edit_patch <> '{}'::jsonb
     and edit_patch - array[
       'roof_area_sqft', 'roof_type', 'roof_system', 'roof_condition_score',
       'report_summary', 'recommendation'
@@ -148,7 +148,7 @@ begin
     raise exception 'A change reason of at least 10 characters is required';
   end if;
   if requested_edit_patch is null or jsonb_typeof(requested_edit_patch) <> 'object'
-     or jsonb_object_length(requested_edit_patch) = 0 then
+     or requested_edit_patch = '{}'::jsonb then
     raise exception 'At least one report field must be changed';
   end if;
 

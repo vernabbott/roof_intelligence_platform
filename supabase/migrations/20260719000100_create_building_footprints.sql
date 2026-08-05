@@ -1,5 +1,8 @@
 -- Canonical, non-destructive schema for building footprints.
--- PostGIS must already be enabled in the Supabase project.
+-- Declare the PostGIS dependency so this baseline can initialize an empty
+-- local beta database as well as a hosted project where it is already enabled.
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
+
 CREATE TABLE IF NOT EXISTS building_footprints (
     id               BIGSERIAL PRIMARY KEY,
 
@@ -9,8 +12,8 @@ CREATE TABLE IF NOT EXISTS building_footprints (
     county           TEXT NOT NULL,
     municipality     TEXT,
 
-    geometry         geometry(MultiPolygon, 4326) NOT NULL,
-    centroid         geometry(Point, 4326),
+    geometry         extensions.geometry(MultiPolygon, 4326) NOT NULL,
+    centroid         extensions.geometry(Point, 4326),
 
     footprint_sqft   NUMERIC(12,2),
     perimeter_ft     NUMERIC(12,2),

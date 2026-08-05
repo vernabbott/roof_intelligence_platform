@@ -2,6 +2,27 @@
 
 The SQL migrations in this directory are ordered by their timestamp prefixes.
 
+## Local beta database
+
+This beta repository is the migration ledger for the shared PCS/PilotPoint
+local Supabase stack. The local stack creates the same database structures used
+by both beta applications but loads only `supabase/seed.sql`, which contains a
+small synthetic contact, organization, and proposal set. In particular,
+`building_footprints` is created empty and the production footprint corpus is
+not copied.
+
+```sh
+npm install
+colima start
+npm run supabase:start
+npm run supabase:reset
+npm run supabase:status
+```
+
+The API is available only on the local machine at `http://127.0.0.1:54321`.
+Stop the services with `npm run supabase:stop` and `colima stop` when they are
+not needed.
+
 The initial files are a version-controlled baseline of database changes that
 were already applied manually to the PCS Supabase project. Before using the
 Supabase CLI to push later migrations, mark these baseline versions as applied
@@ -43,6 +64,8 @@ are future feature work and require a separate migration and design review.
 | `20260722000200_prepare_roof_intelligence_cutover.sql` | Applied and verified July 22, 2026 |
 | `20260722000300_add_report_edit_requests_and_authenticated_access.sql` | Prepared locally; not applied |
 | `20260726000100_add_reviewed_processing_feedback.sql` | Prepared locally; not applied; depends on `20260722000300` |
+| `20260805000100_create_contact_organization_model.sql` | Consolidated current model for empty local beta databases |
+| `20260805000200_create_proposal_tracking.sql` | Current four-state proposal model for empty local beta databases |
 
 This migration creates empty centralized Roof Intelligence job, property,
 report, immutable revision, asset, notification, and county-health structures,
