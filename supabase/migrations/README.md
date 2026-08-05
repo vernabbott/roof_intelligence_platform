@@ -66,15 +66,19 @@ are future feature work and require a separate migration and design review.
 | `20260726000100_add_reviewed_processing_feedback.sql` | Prepared locally; not applied; depends on `20260722000300` |
 | `20260805000100_create_contact_organization_model.sql` | Consolidated current model for empty local beta databases |
 | `20260805000200_create_proposal_tracking.sql` | Current four-state proposal model for empty local beta databases |
+| `20260805145432_add_multi_tenant_foundation.sql` | Permanent beta tenant, membership, role, settings, report-folder, RLS, and Storage isolation foundation |
 
 This migration creates empty centralized Roof Intelligence job, property,
 report, immutable revision, asset, notification, and county-health structures,
 plus private PDF and image buckets. It intentionally imports none of the local
 test reports or artifacts and does not change PCS or PilotPoint runtime behavior.
 
-Row-level security is enabled without browser-facing policies. Application
-access policies will be added only when the PCS authentication and integration
-work begins.
+The multi-tenant migration replaces the earlier broad authenticated report
+policies with membership-based row-level security. It also gives every
+tenant-owned business and report record a required `tenant_id`, while keeping
+the large footprint and canonical property datasets shared and read-only.
+PCS uses a publishable key plus the signed-in user's JWT; only the protected
+PilotPoint worker may use the service role.
 
 Live verification confirmed that all eight tables were empty after creation,
 both Storage buckets were private, row-level security was enabled on every new
@@ -89,9 +93,10 @@ was empty, its retention and override lifecycle passed inside a rolled-back
 transaction, and only `service_role` can execute the atomic worker-claim
 function. PCS and PilotPoint do not call these structures yet.
 
-The report-edit migration adds an authenticated, idempotent request queue and
-read-only report-history policies for the future PCS web application. It must
-be rehearsed in the separate staging project before it is applied elsewhere.
+The report-edit migration adds an authenticated, idempotent request queue. The
+later multi-tenant migration scopes that queue and its security-definer RPC to
+the actor's active company membership. Local beta is the current rehearsal
+environment; no paid hosted beta project is required.
 
 The reviewed-processing-feedback migration adds an explicit opt-in flag to
 report edits and creates a human-reviewed correction queue. Pending and
