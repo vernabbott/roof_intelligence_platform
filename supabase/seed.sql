@@ -127,35 +127,55 @@ insert into public.organization_contact (
 
 insert into public.proposal (
   id, tenant_id, customer_name, project_street_address, project_city, project_state,
-  project_zip_code, lead_source, submitted_by, estimated_by,
-  estimate_completed_date, proposal_sent_date, follow_up_date, status,
-  proposal_folder_name, source_name, source_row_number
+  project_zip_code, proposal_folder_name
 ) values
   (
     '40000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000001',
     'Sample Apartments', '101 Test Avenue', 'Denver', 'CO', '80202',
-    'Referral', 'Beta Salesperson', 'Beta Estimator',
-    current_date - 10, current_date - 9, current_date - 2, 'sent',
-    'Sample Apartments - 101 Test Avenue', 'local_seed', 2
+    'Sample Apartments - 101 Test Avenue'
   ),
   (
     '40000000-0000-4000-8000-000000000002',
     '00000000-0000-4000-8000-000000000001',
     'Example Offices', '202 Demo Street', 'Aurora', 'CO', '80012',
-    'Website', 'Beta Salesperson', 'Beta Estimator',
-    current_date - 30, current_date - 28, current_date - 21, 'under_contract',
-    'Example Offices - 202 Demo Street', 'local_seed', 3
+    'Example Offices - 202 Demo Street'
   ),
   (
     '40000000-0000-4000-8000-000000000003',
     '00000000-0000-4000-8000-000000000001',
     'Training Warehouse', '303 Mockingbird Lane', 'Lakewood', 'CO', '80226',
-    'Cold Call', 'Beta Salesperson', 'Beta Estimator',
-    current_date - 45, current_date - 43, null, 'dead',
-    'Training Warehouse - 303 Mockingbird Lane', 'local_seed', 4
+    'Training Warehouse - 303 Mockingbird Lane'
   )
 on conflict (id) do nothing;
+
+insert into public.proposal_tracking (
+  proposal_id, tenant_id, lead_source, submitted_by, estimated_by,
+  estimate_completed_date, proposal_sent_date, follow_up_date, status,
+  source_name, source_row_number
+) values
+  (
+    '40000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    'Referral', 'Beta Salesperson', 'Beta Estimator',
+    current_date - 10, current_date - 9, current_date - 2, 'sent',
+    'local_seed', 2
+  ),
+  (
+    '40000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000001',
+    'Website', 'Beta Salesperson', 'Beta Estimator',
+    current_date - 30, current_date - 28, current_date - 21, 'under_contract',
+    'local_seed', 3
+  ),
+  (
+    '40000000-0000-4000-8000-000000000003',
+    '00000000-0000-4000-8000-000000000001',
+    'Cold Call', 'Beta Salesperson', 'Beta Estimator',
+    current_date - 45, current_date - 43, null, 'dead',
+    'local_seed', 4
+  )
+on conflict (proposal_id) do nothing;
 
 insert into public.proposal_contact (
   tenant_id, proposal_id, organization_contact_id, contact_role, is_primary

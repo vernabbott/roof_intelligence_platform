@@ -67,6 +67,7 @@ are future feature work and require a separate migration and design review.
 | `20260805000100_create_contact_organization_model.sql` | Consolidated current model for empty local beta databases |
 | `20260805000200_create_proposal_tracking.sql` | Current four-state proposal model for empty local beta databases |
 | `20260805145432_add_multi_tenant_foundation.sql` | Permanent beta tenant, membership, role, settings, report-folder, RLS, and Storage isolation foundation |
+| `20260805162011_normalize_proposal_tracking.sql` | Splits customer/project identity into `proposal` and lifecycle fields into a tenant-scoped one-to-one `proposal_tracking` row |
 
 This migration creates empty centralized Roof Intelligence job, property,
 report, immutable revision, asset, notification, and county-health structures,
@@ -79,6 +80,12 @@ tenant-owned business and report record a required `tenant_id`, while keeping
 the large footprint and canonical property datasets shared and read-only.
 PCS uses a publishable key plus the signed-in user's JWT; only the protected
 PilotPoint worker may use the service role.
+
+The proposal normalization migration uses `proposal_tracking.proposal_id` as
+its primary key and a tenant-matching foreign key to `proposal`. Customer name,
+project address, city, state, ZIP, display name, and proposal-folder identity
+exist only on `proposal`; tracking assignments, dates, response, status, and
+source-reconciliation fields exist only on `proposal_tracking`.
 
 Live verification confirmed that all eight tables were empty after creation,
 both Storage buckets were private, row-level security was enabled on every new
